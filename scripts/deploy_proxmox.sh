@@ -7,7 +7,7 @@ pct create 300 $TEMPLATE \
   --hostname raptorcore \
   --cores 8 \
   --memory 16384 \
-  --rootfs local-lvm:64 \
+  --rootfs ssdpool \
   --net0 name=eth0,bridge=vmbr0,ip=dhcp \
   --features nesting=1 \
   --unprivileged 0
