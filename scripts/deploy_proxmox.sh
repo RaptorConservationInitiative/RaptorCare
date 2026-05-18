@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-TEMPLATE="local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst"
+TEMPLATE="local:vztmpl/ubuntu-26.04-standard_26.04-1_amd64.tar.zst"
 
 pct create 300 $TEMPLATE \
   --hostname raptorcore \
