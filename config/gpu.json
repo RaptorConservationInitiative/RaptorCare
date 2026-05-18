@@ -1,0 +1,4 @@
+{
+    "inference": "cuda:0",
+    "training": "cuda:1"
+  }

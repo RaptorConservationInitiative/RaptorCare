@@ -1,0 +1,1 @@
+DATABASE_URL = "postgresql://raptorcare:password@localhost/raptorcare"
