@@ -4,7 +4,7 @@ set -e
 apt update
 apt install -y python3 python3-pip git postgresql redis-server
 
-pip3 install -r requirements.txt
+pip install --break-system-packages -r requirements.txt
 
 mkdir -p /opt/raptorcare
 
