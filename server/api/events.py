@@ -1,20 +1,42 @@
 from fastapi import APIRouter
-from server.state import EVENTS
-from server.core.audit import append_audit
+from server.db import get_conn
+import json
 
-router = APIRouter()
+router = APIRouter(prefix="/events")
 
-@router.post("/event")
-def ingest_event(event: dict):
+@router.post("/")
+def create_event(data: dict):
+    conn = get_conn()
+    cur = conn.cursor()
 
-    EVENTS.append(event)
-    append_audit(event)
+    cur.execute(
+        """
+        INSERT INTO events (animal_id, station_id, event_type, payload)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id
+        """,
+        (
+            data.get("animal_id"),
+            data.get("station_id"),
+            data["event_type"],
+            json.dumps(data.get("payload", {}))
+        )
+    )
 
-    return {
-        "status": "stored",
-        "count": len(EVENTS)
-    }
+    event_id = cur.fetchone()[0]
+    conn.commit()
+    conn.close()
 
-@router.get("/events")
-def get_events():
-    return EVENTS
+    return {"id": event_id}
+
+
+@router.get("/")
+def list_events():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT id, event_type FROM events ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
+
+    return [{"id": r[0], "type": r[1]} for r in rows]
