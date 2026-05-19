@@ -33,8 +33,8 @@ def login(data: dict):
         raise HTTPException(401, "Invalid credentials")
 
     token = create_token({
-        "user_id": user[0],
-        "role": user[2]
+        "user_id": user["id"],
+        "role": user["role"]
     })
 
     return {"token": token}
