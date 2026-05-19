@@ -1,15 +1,12 @@
 from fastapi import Header, HTTPException
 from server.auth.jwt import verify_token
 
-def require_user(authorization: str = Header(None)):
+from fastapi import Request, HTTPException
 
-    if not authorization:
-        raise HTTPException(401, "Missing token")
+def require_user(request: Request):
+    token = request.cookies.get("token")
 
-    token = authorization.replace("Bearer ", "")
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing token")
 
-    try:
-        return verify_token(token)
-
-    except Exception:
-        raise HTTPException(401, "Invalid token")
+    return token
