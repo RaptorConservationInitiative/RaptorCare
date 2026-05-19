@@ -1,24 +1,21 @@
 import json
+import uuid
+from datetime import datetime
+from pathlib import Path
 
-QUEUE = []
+WAL_FILE = Path("station/wal.log")
 
+def append_event(event_type, payload):
 
-def write_event(event):
+    event = {
+        "event_id": str(uuid.uuid4()),
+        "event_type": event_type,
+        "payload": payload,
+        "created_at": datetime.utcnow().isoformat(),
+        "synced": False
+    }
 
-    QUEUE.append(event)
-
-    with open("wal.log", "a") as f:
+    with open(WAL_FILE, "a") as f:
         f.write(json.dumps(event) + "\n")
 
-
-def flush_queue():
-
-    global QUEUE
-
-    synced = len(QUEUE)
-
-    QUEUE = []
-
-    return {
-        "synced": synced
-    }
+    return event
