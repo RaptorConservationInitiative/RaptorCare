@@ -1,6 +1,8 @@
 from fastapi import APIRouter
 from server.db import get_conn
 import json
+from fastapi import Depends
+from server.auth.dependencies import require_user
 
 router = APIRouter(prefix="/animals")
 
@@ -33,6 +35,7 @@ def create_animal(data: dict):
 
 @router.get("/")
 def list_animals():
+    user=Depends(require_user)
     conn = get_conn()
     cur = conn.cursor()
 
