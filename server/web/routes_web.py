@@ -19,8 +19,11 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "web/templates"))
 # -------------------
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
-
+    return templates.TemplateResponse(
+        request,
+        "login.html",
+        {}
+    )
 
 
 @router.post("/login")
@@ -62,9 +65,9 @@ def dashboard(request: Request, user=Depends(require_user)):
     conn.close()
 
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
         {
-            "request": request,
             "animals": animals
         }
     )
