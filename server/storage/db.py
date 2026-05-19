@@ -1,3 +1,4 @@
+from psycopg2.extras import RealDictCursor
 import psycopg2
 import os
 
@@ -7,4 +8,4 @@ DB_URL = os.getenv(
 )
 
 def get_conn():
-    return psycopg2.connect(DB_URL)
+    return psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
