@@ -1,4 +1,4 @@
-from fastapi import Request, HTTPException
+from fastapi import Request, HTTPException, Header
 from server.auth.jwt import verify_token
 """
 def require_user(request: Request):
