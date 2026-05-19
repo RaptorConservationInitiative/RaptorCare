@@ -17,14 +17,14 @@ def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 
+
 @router.post("/login")
 def login(username: str = Form(...), password: str = Form(...)):
-
     conn = get_conn()
     cur = conn.cursor()
 
     cur.execute(
-        "SELECT id, password_hash, role FROM users WHERE username=%s",
+        "SELECT id, username, password_hash FROM users WHERE username = %s",
         (username,)
     )
 
@@ -32,15 +32,15 @@ def login(username: str = Form(...), password: str = Form(...)):
     conn.close()
 
     if not user:
-        return RedirectResponse("/login", status_code=302)
+        return {"error": "invalid credentials"}
 
-    # NOTE: password check kommt aus Auth Phase (vereinfachen wir hier)
-    token = create_token({"user_id": user[0], "role": user[2]})
+    # TODO: password check (abhängig von deinem hashing)
+    token = create_token({"user_id": user[0]})
 
-    response = RedirectResponse("/dashboard", status_code=302)
-    response.set_cookie("token", token)
-
-    return response
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
 
 
 # -------------------
