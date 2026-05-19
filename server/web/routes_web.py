@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from server.auth.jwt import create_token
 from server.storage.db import get_conn
+from psycopg2.extras import RealDictCursor
 
 router = APIRouter()
 templates = Jinja2Templates(directory="server/web/templates")
@@ -45,11 +46,11 @@ def login(username: str = Form(...), password: str = Form(...)):
 # -------------------
 # DASHBOARD
 # -------------------
-@router.get("/dashboard", response_class=HTMLResponse)
+@router.get("/dashboard")
 def dashboard(request: Request):
 
     conn = get_conn()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     cur.execute("SELECT id, tag_id, species FROM animals")
     animals = cur.fetchall()
@@ -58,5 +59,8 @@ def dashboard(request: Request):
 
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "animals": animals}
+        {
+            "request": request,
+            "animals": animals
+        }
     )
