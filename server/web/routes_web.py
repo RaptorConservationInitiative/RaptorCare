@@ -51,7 +51,7 @@ def dashboard(request: Request):
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("SELECT id, name, species FROM animals")
+    cur.execute("SELECT id, tag_id, species FROM animals")
     animals = cur.fetchall()
 
     conn.close()

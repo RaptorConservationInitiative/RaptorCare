@@ -9,7 +9,7 @@
 
 <ul>
     {% for a in animals %}
-        <li>{{ a[1] }} ({{ a[2] }})</li>
+        <li>{{ a["tag_id"] }} ({{ a["species"] }})</li>
     {% endfor %}
 </ul>
 
