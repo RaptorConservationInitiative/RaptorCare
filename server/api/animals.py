@@ -1,15 +1,22 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from server.storage.db import get_conn
-import json
-from fastapi import Depends
 from server.auth.dependencies import require_user
+from psycopg2.extras import RealDictCursor
+import json
 
 router = APIRouter(prefix="/animals")
 
+
+# -------------------------
+# CREATE
+# -------------------------
 @router.post("/")
-def create_animal(data: dict):
+def create_animal(
+    data: dict,
+    user=Depends(require_user)
+):
     conn = get_conn()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     cur.execute(
         """
@@ -26,24 +33,27 @@ def create_animal(data: dict):
         )
     )
 
-    animal_id = cur.fetchone()[0]
+    animal_id = cur.fetchone()["id"]
+
     conn.commit()
     conn.close()
 
     return {"id": animal_id}
 
 
+# -------------------------
+# LIST
+# -------------------------
 @router.get("/")
-def list_animals():
+def list_animals(
     user=Depends(require_user)
+):
     conn = get_conn()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     cur.execute("SELECT id, tag_id, species, status FROM animals")
     rows = cur.fetchall()
+
     conn.close()
 
-    return [
-        {"id": r[0], "tag_id": r[1], "species": r[2], "status": r[3]}
-        for r in rows
-    ]
+    return rows
