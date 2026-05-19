@@ -4,10 +4,12 @@ from fastapi.templating import Jinja2Templates
 from server.auth.jwt import create_token
 from server.storage.db import get_conn
 from psycopg2.extras import RealDictCursor
+import os
 
 router = APIRouter()
-templates = Jinja2Templates(directory="server/web/templates")
 
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "web/templates"))
 
 # -------------------
 # LOGIN PAGE
