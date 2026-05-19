@@ -43,7 +43,7 @@ def login(username: str = Form(...), password: str = Form(...)):
         return {"error": "invalid credentials"}
 
     # TODO: password check (abhängig von deinem hashing)
-    token = create_token({"user_id": user[0]})
+    token = create_token({"user_id": user["id"]})
 
     response = RedirectResponse(url="/dashboard", status_code=302)
     response.set_cookie(key="token", value=token, httponly=True)
