@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 
-from server.models import SyncQueue, Bird, HealthRecord, FeedingLog
+from server.models import SyncQueue, Bird, HealthRecord, FeedingLog, CalendarEvent
 from server.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -274,6 +274,20 @@ class SyncManager:
                     "created_at": fl.created_at.isoformat()
                 }
                 for fl in feeding_logs
+            ]
+
+            calendar_events = self.db.query(CalendarEvent).filter(
+                CalendarEvent.station_id == station_id,
+                CalendarEvent.updated_at >= since
+            ).all()
+            changes["calendar_events"] = [
+                {
+                    "id": ce.id,
+                    "title": ce.title,
+                    "start_at": ce.start_at.isoformat(),
+                    "updated_at": ce.updated_at.isoformat(),
+                }
+                for ce in calendar_events
             ]
 
             logger.info(f"Generated delta for {station_id} since {since}")

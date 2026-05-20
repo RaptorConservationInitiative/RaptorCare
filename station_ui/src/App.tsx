@@ -7,6 +7,21 @@ type QueueItem = {
   data: Record<string, any>
 }
 
+type StationInfo = {
+  station_id: string
+  name: string
+  location: string
+  created_at: string
+  updated_at: string
+  sync_stats: {
+    total: number
+    pending: number
+    completed: number
+    failed: number
+    queue_utilization_percent: number
+  }
+}
+
 const STORAGE_KEY = 'raptorcare_station_queue'
 
 function loadQueue(): QueueItem[] {
@@ -31,10 +46,13 @@ function App() {
   const [syncResult, setSyncResult] = useState<string>('')
   const [statusMessage, setStatusMessage] = useState('Ready')
   const [birdInternalId, setBirdInternalId] = useState('')
+  const [birdAnimalClass, setBirdAnimalClass] = useState('bird')
   const [birdSpecies, setBirdSpecies] = useState('peregrine_falcon')
   const [healthBirdId, setHealthBirdId] = useState(1)
   const [healthWeight, setHealthWeight] = useState(0)
   const [healthBehavior, setHealthBehavior] = useState('')
+  const [stations, setStations] = useState<StationInfo[]>([])
+  const [stationDetails, setStationDetails] = useState('No station data loaded yet.')
 
   useEffect(() => {
     setQueue(loadQueue())
@@ -62,7 +80,6 @@ function App() {
       data: {
         internal_id: birdInternalId,
         species: birdSpecies,
-        status: 'in_treatment',
       },
     })
 
@@ -85,6 +102,35 @@ function App() {
 
     setHealthBehavior('')
     setStatusMessage('Health record stored locally.')
+  }
+
+  const createCalendarEvent = () => {
+    if (!calendarTitle || !calendarDate) {
+      setStatusMessage('Please provide a title and date for the calendar event.')
+      return
+    }
+
+    const startAt = `${calendarDate}T${calendarTime}:00Z`
+
+    addQueueItem({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      action: 'create',
+      entity_type: 'calendar_event',
+      data: {
+        title: calendarTitle,
+        description: calendarNotes,
+        start_at: startAt,
+        end_at: startAt,
+        all_day: false,
+        location: calendarLocation,
+        bird_id: healthBirdId,
+      },
+    })
+
+    setCalendarTitle('')
+    setCalendarNotes('')
+    setCalendarLocation('')
+    setStatusMessage('Calendar event saved locally and queued for sync.')
   }
 
   const syncWithServer = async () => {
@@ -123,6 +169,44 @@ function App() {
     }
   }
 
+  const loadStations = async () => {
+    if (!token) {
+      setStatusMessage('Please provide a bearer token to load stations.')
+      return
+    }
+
+    try {
+      const response = await fetch(`${serverUrl}/stations`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`${response.status} ${text}`)
+      }
+
+      const data = await response.json()
+      setStations(data.stations || [])
+      setStatusMessage('Loaded station list from server.')
+    } catch (error: any) {
+      setStatusMessage(`Failed to load stations: ${error.message}`)
+    }
+  }
+
+  const showStationDetails = (station_id: string) => {
+    const station = stations.find((s) => s.station_id === station_id)
+    if (!station) {
+      setStationDetails('Selected station not found in loaded list.')
+      return
+    }
+
+    setStationDetails(
+      `Station ${station.station_id} (${station.name})\nLocation: ${station.location}\nPending: ${station.sync_stats.pending}\nCompleted: ${station.sync_stats.completed}\nFailed: ${station.sync_stats.failed}\nQueue utilization: ${station.sync_stats.queue_utilization_percent.toFixed(1)}%`
+    )
+  }
+
   return (
     <div className="container">
       <header>
@@ -145,6 +229,7 @@ function App() {
             Bearer Token
             <input value={token} onChange={(e) => setToken(e.target.value)} type="password" />
           </label>
+          <button className="primary" onClick={loadStations}>Load stations from server</button>
         </div>
       </section>
 
@@ -188,6 +273,31 @@ function App() {
             </label>
             <button onClick={recordHealth}>Store health check</button>
           </div>
+
+          <div className="card">
+            <h3>Schedule Calendar Event</h3>
+            <label>
+              Title
+              <input value={calendarTitle} onChange={(e) => setCalendarTitle(e.target.value)} />
+            </label>
+            <label>
+              Date
+              <input type="date" value={calendarDate} onChange={(e) => setCalendarDate(e.target.value)} />
+            </label>
+            <label>
+              Time
+              <input type="time" value={calendarTime} onChange={(e) => setCalendarTime(e.target.value)} />
+            </label>
+            <label>
+              Location
+              <input value={calendarLocation} onChange={(e) => setCalendarLocation(e.target.value)} />
+            </label>
+            <label>
+              Notes
+              <textarea value={calendarNotes} onChange={(e) => setCalendarNotes(e.target.value)} />
+            </label>
+            <button onClick={createCalendarEvent}>Add calendar event</button>
+          </div>
         </div>
       </section>
 
@@ -210,6 +320,21 @@ function App() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section>
+        <h2>Loaded Stations</h2>
+        <div className="queue-list">
+          {stations.map((station) => (
+            <div key={station.station_id} className="queue-item">
+              <strong>{station.name}</strong>
+              <p>ID: {station.station_id}</p>
+              <p>Pending: {station.sync_stats.pending} / Total: {station.sync_stats.total}</p>
+              <button onClick={() => showStationDetails(station.station_id)}>Show details</button>
+            </div>
+          ))}
+        </div>
+        <pre>{stationDetails}</pre>
       </section>
     </div>
   )

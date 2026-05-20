@@ -9,6 +9,42 @@ type GPUInfo = {
   utilization_percent: number
 }
 
+type StationInfo = {
+  station_id: string
+  name: string
+  location: string
+  created_at: string
+  updated_at: string
+  sync_stats: {
+    total: number
+    pending: number
+    completed: number
+    failed: number
+    queue_utilization_percent: number
+  }
+}
+
+type BirdInfo = {
+  id: number
+  internal_id: string
+  species: string
+  status: string
+  station_id: string
+  admission_date: string
+}
+
+type CalendarEventInfo = {
+  id: number
+  title: string
+  station_id: string
+  bird_id?: number
+  description?: string
+  start_at: string
+  end_at?: string
+  all_day: boolean
+  location?: string
+}
+
 type ResearchOutput = {
   research_text: string
   gpu_used?: number
@@ -18,13 +54,16 @@ type ResearchOutput = {
 function App() {
   const [serverUrl, setServerUrl] = useState('http://localhost:8000')
   const [token, setToken] = useState('')
-  const [stationId, setStationId] = useState('station_001')
+  const [stations, setStations] = useState<StationInfo[]>([])
+  const [selectedStation, setSelectedStation] = useState('station_001')
+  const [stationData, setStationData] = useState('No station data loaded yet.')
+  const [birds, setBirds] = useState<BirdInfo[]>([])
+  const [events, setEvents] = useState<CalendarEventInfo[]>([])
   const [gpuStatus, setGpuStatus] = useState<GPUInfo[] | null>(null)
   const [researchResponse, setResearchResponse] = useState<string>('')
   const [researchGoal, setResearchGoal] = useState('Summarize this case and provide research questions.')
   const [researchNotes, setResearchNotes] = useState('')
-  const [selectedStation, setSelectedStation] = useState('station_001')
-  const [stationData, setStationData] = useState('No station data loaded yet.')
+  const [statusMessage, setStatusMessage] = useState('Ready')
 
   const headers = token
     ? {
@@ -34,44 +73,157 @@ function App() {
     : { 'Content-Type': 'application/json' }
 
   const fetchGpuStatus = async () => {
+    if (!token) {
+      setResearchResponse('Please provide a bearer token to fetch GPU status.')
+      return
+    }
+
     try {
       const response = await fetch(`${serverUrl}/research/gpu-status`, {
         headers,
       })
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`${response.status} ${text}`)
+      }
       const data = await response.json()
       setGpuStatus(data.gpus || [])
-    } catch (error) {
+      setStatusMessage('GPU status loaded successfully.')
+    } catch (error: any) {
       setGpuStatus(null)
-      setResearchResponse(`GPU status fetch failed: ${error}`)
+      setStatusMessage(`GPU status fetch failed: ${error.message}`)
+    }
+  }
+
+  const fetchStations = async () => {
+    if (!token) {
+      setStatusMessage('Please provide a bearer token to load stations.')
+      return
+    }
+
+    try {
+      const response = await fetch(`${serverUrl}/stations`, {
+        headers,
+      })
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`${response.status} ${text}`)
+      }
+
+      const data = await response.json()
+      setStations(data.stations || [])
+      setStatusMessage('Station overview loaded.')
+      if (data.stations?.length) {
+        setSelectedStation(data.stations[0].station_id)
+      }
+    } catch (error: any) {
+      setStatusMessage(`Failed to load stations: ${error.message}`)
     }
   }
 
   const requestResearch = async (endpoint: string) => {
-    const response = await fetch(`${serverUrl}/research/${endpoint}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        bird_data: {
-          species: 'Peregrine Falcon',
-          status: 'in_treatment',
-          weight: 950,
-          days_in_care: 6,
-          injury: 'wing fracture',
-        },
-        health_history: [
-          { date: '2026-05-18', metric: 'weight', value: 930, behavior: 'alert' },
-          { date: '2026-05-19', metric: 'weight', value: 940, behavior: 'improving' },
-        ],
-        notes: researchNotes || researchGoal,
-        research_goal: researchGoal,
-      }),
-    })
-    const data: ResearchOutput = await response.json()
-    setResearchResponse(data.research_text)
+    if (!token) {
+      setResearchResponse('Please provide a bearer token for research requests.')
+      return
+    }
+
+    try {
+      const response = await fetch(`${serverUrl}/research/${endpoint}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          bird_data: {
+            species: 'Peregrine Falcon',
+            status: 'in_treatment',
+            weight: 950,
+            days_in_care: 6,
+            injury: 'wing fracture',
+          },
+          health_history: [
+            { date: '2026-05-18', metric: 'weight', value: 930, behavior: 'alert' },
+            { date: '2026-05-19', metric: 'weight', value: 940, behavior: 'improving' },
+          ],
+          notes: researchNotes || researchGoal,
+          research_goal: researchGoal,
+        }),
+      })
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`${response.status} ${text}`)
+      }
+      const data: ResearchOutput = await response.json()
+      setResearchResponse(data.research_text)
+      setStatusMessage(`Research result returned from ${endpoint}.`)
+    } catch (error: any) {
+      setResearchResponse(`Request failed: ${error.message}`)
+      setStatusMessage('Research request failed.')
+    }
+  }
+
+  const fetchBirds = async (stationId?: string) => {
+    if (!token) {
+      setStatusMessage('Please provide a bearer token to fetch bird records.')
+      return
+    }
+
+    try {
+      const path = stationId
+        ? `${serverUrl}/birds?station_id=${encodeURIComponent(stationId)}&limit=100`
+        : `${serverUrl}/birds?limit=100`
+      const response = await fetch(path, {
+        headers,
+      })
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`${response.status} ${text}`)
+      }
+      const data = await response.json()
+      setBirds(data.birds || [])
+      setStatusMessage(`Loaded ${data.birds?.length ?? 0} bird records.`)
+    } catch (error: any) {
+      setBirds([])
+      setStatusMessage(`Failed to load birds: ${error.message}`)
+    }
+  }
+
+  const fetchCalendarEvents = async (stationId: string) => {
+    if (!token) {
+      setStatusMessage('Please provide a bearer token to load calendar events.')
+      return
+    }
+
+    try {
+      const response = await fetch(`${serverUrl}/calendar/events?station_id=${encodeURIComponent(stationId)}`, {
+        headers,
+      })
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`${response.status} ${text}`)
+      }
+      const data = await response.json()
+      setEvents(data)
+      setStatusMessage(`Loaded ${data.length} calendar events for ${stationId}.`)
+    } catch (error: any) {
+      setEvents([])
+      setStatusMessage(`Failed to load calendar events: ${error.message}`)
+    }
   }
 
   const loadStationData = () => {
-    setStationData(`Station ${selectedStation} data is not available in this prototype.`)
+    const station = stations.find((item) => item.station_id === selectedStation)
+    if (!station) {
+      setStationData('Select a station and load the station overview first.')
+      return
+    }
+
+    setStationData(
+      `Station ${station.station_id} (${station.name})\n` +
+        `Location: ${station.location}\n` +
+        `Queue pending: ${station.sync_stats.pending}\n` +
+        `Queue completed: ${station.sync_stats.completed}\n` +
+        `Queue failed: ${station.sync_stats.failed}\n` +
+        `Utilization: ${station.sync_stats.queue_utilization_percent.toFixed(1)}%`
+    )
   }
 
   return (
@@ -98,17 +250,66 @@ function App() {
       <section>
         <h2>Station Overview</h2>
         <div className="grid">
+          <button className="primary" onClick={fetchStations}>Refresh stations list</button>
           <label>
             Select station
             <select value={selectedStation} onChange={(e) => setSelectedStation(e.target.value)}>
-              <option value="station_001">station_001</option>
-              <option value="station_002">station_002</option>
-              <option value="station_003">station_003</option>
+              {stations.map((station) => (
+                <option key={station.station_id} value={station.station_id}>
+                  {station.station_id}
+                </option>
+              ))}
             </select>
           </label>
-          <button className="primary" onClick={loadStationData}>Load station data</button>
+          <button className="primary" onClick={loadStationData}>Show station details</button>
+          <button className="primary" onClick={() => fetchBirds(selectedStation)}>Load birds for selected station</button>
+          <button className="primary" onClick={() => fetchCalendarEvents(selectedStation)}>Load schedule</button>
         </div>
         <pre>{stationData}</pre>
+        <div className="queue-list">
+          {stations.map((station) => (
+            <div key={station.station_id} className="queue-item">
+              <strong>{station.name}</strong>
+              <p>ID: {station.station_id}</p>
+              <p>Pending: {station.sync_stats.pending}</p>
+              <p>Completed: {station.sync_stats.completed}</p>
+              <p>Failed: {station.sync_stats.failed}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>Patient List</h2>
+        <button className="primary" onClick={() => fetchBirds(selectedStation)}>Refresh patient list</button>
+        <div className="queue-list">
+          {birds.map((bird) => (
+            <div key={bird.id} className="queue-item">
+              <strong>{bird.internal_id}</strong>
+              <p>Species: {bird.species}</p>
+              <p>Status: {bird.status}</p>
+              <p>Station: {bird.station_id}</p>
+              <p>Admitted: {new Date(bird.admission_date).toLocaleDateString()}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>Calendar / Schedule</h2>
+        <button className="primary" onClick={() => fetchCalendarEvents(selectedStation)}>Refresh schedule</button>
+        <div className="queue-list">
+          {events.map((event) => (
+            <div key={event.id} className="queue-item">
+              <strong>{event.title}</strong>
+              <p>Station: {event.station_id}</p>
+              <p>Bird ID: {event.bird_id ?? 'n/a'}</p>
+              <p>{new Date(event.start_at).toLocaleString()} {event.all_day ? '(all day)' : ''}</p>
+              <p>Location: {event.location ?? 'Not specified'}</p>
+              <p>{event.description}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section>
@@ -134,6 +335,7 @@ function App() {
       <section>
         <h2>GPU Status</h2>
         <button className="primary" onClick={fetchGpuStatus}>Refresh GPU status</button>
+        <p>{statusMessage}</p>
         <div className="gpu-list">
           {gpuStatus?.map((gpu) => (
             <div key={gpu.device_id} className="card">

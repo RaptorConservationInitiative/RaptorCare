@@ -21,14 +21,26 @@ class BirdStatus(str, enum.Enum):
     PERMANENTLY_NON_RELEASABLE = "permanently_non_releasable"
     DECEASED = "deceased"
 
+class AnimalClass(str, enum.Enum):
+    """High-level animal categories"""
+    BIRD = "bird"
+    REPTILE = "reptile"
+    MAMMAL = "mammal"
+    OTHER = "other"
+
 class SpeciesType(str, enum.Enum):
-    """Protected raptor species"""
+    """Patient species types across birds, reptiles and mammals"""
     PEREGRINE_FALCON = "peregrine_falcon"
     EURASIAN_EAGLE_OWL = "eurasian_eagle_owl"
     RED_KITE = "red_kite"
     COMMON_KESTREL = "common_kestrel"
     COMMON_BUZZARD = "common_buzzard"
     EURASIAN_SPARROWHAWK = "eurasian_sparrowhawk"
+    GREEN_IGUANA = "green_iguana"
+    BALL_PYTHON = "ball_python"
+    RED_FOX = "red_fox"
+    EUROPEAN_HEDGEHOG = "european_hedgehog"
+    COMMON_WALLABY = "common_wallaby"
     OTHER = "other"
 
 class Gender(str, enum.Enum):
@@ -86,6 +98,7 @@ class Bird(Base):
     tag_id = Column(String(50), unique=True, nullable=True)
 
     # Species information
+    animal_class = Column(Enum(AnimalClass), default=AnimalClass.BIRD)
     species = Column(Enum(SpeciesType), nullable=False)
     gender = Column(Enum(Gender), default=Gender.UNKNOWN)
     estimated_age = Column(String(50))  # e.g., "juvenile", "2 years", "adult"
@@ -115,6 +128,7 @@ class Bird(Base):
     medications = relationship("Medication", back_populates="bird", cascade="all, delete-orphan")
     media = relationship("Media", back_populates="bird", cascade="all, delete-orphan")
     events = relationship("TimelineEvent", back_populates="bird", cascade="all, delete-orphan")
+    calendar_events = relationship("CalendarEvent", back_populates="bird", cascade="all, delete-orphan")
 
 # ============================================================================
 # HEALTH & MEDICAL DATA
@@ -257,6 +271,26 @@ class TimelineEvent(Base):
 
     # Relationships
     bird = relationship("Bird", back_populates="events")
+
+class CalendarEvent(Base):
+    """Scheduled care, release and procedure events"""
+    __tablename__ = "calendar_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    bird_id = Column(Integer, ForeignKey("birds.id"), nullable=True)
+    station_id = Column(String(50), nullable=False)
+
+    title = Column(String(255), nullable=False)
+    description = Column(Text)
+    start_at = Column(DateTime, nullable=False)
+    end_at = Column(DateTime, nullable=True)
+    all_day = Column(Boolean, default=False)
+    location = Column(String(255), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    bird = relationship("Bird", back_populates="calendar_events")
 
 # ============================================================================
 # STATION & ENCLOSURE MANAGEMENT

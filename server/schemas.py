@@ -17,6 +17,12 @@ class BirdStatusSchema(str, Enum):
     PERMANENTLY_NON_RELEASABLE = "permanently_non_releasable"
     DECEASED = "deceased"
 
+class AnimalClassSchema(str, Enum):
+    BIRD = "bird"
+    REPTILE = "reptile"
+    MAMMAL = "mammal"
+    OTHER = "other"
+
 class SpeciesTypeSchema(str, Enum):
     PEREGRINE_FALCON = "peregrine_falcon"
     EURASIAN_EAGLE_OWL = "eurasian_eagle_owl"
@@ -24,6 +30,11 @@ class SpeciesTypeSchema(str, Enum):
     COMMON_KESTREL = "common_kestrel"
     COMMON_BUZZARD = "common_buzzard"
     EURASIAN_SPARROWHAWK = "eurasian_sparrowhawk"
+    GREEN_IGUANA = "green_iguana"
+    BALL_PYTHON = "ball_python"
+    RED_FOX = "red_fox"
+    EUROPEAN_HEDGEHOG = "european_hedgehog"
+    COMMON_WALLABY = "common_wallaby"
     OTHER = "other"
 
 class GenderSchema(str, Enum):
@@ -98,6 +109,7 @@ class BirdCreate(BaseModel):
     internal_id: str
     ring_number: Optional[str] = None
     tag_id: Optional[str] = None
+    animal_class: AnimalClassSchema = AnimalClassSchema.BIRD
     species: SpeciesTypeSchema
     gender: GenderSchema = GenderSchema.UNKNOWN
     estimated_age: Optional[str] = None
@@ -127,6 +139,9 @@ class BirdSchema(BirdCreate):
     created_at: datetime
     updated_at: datetime
 
+    class Config:
+        orm_mode = True
+
 # ============================================================================
 # HEALTH RECORD SCHEMAS
 # ============================================================================
@@ -150,6 +165,9 @@ class HealthRecordSchema(HealthRecordCreate):
     bird_id: int
     recorded_at: datetime
     created_at: datetime
+
+    class Config:
+        orm_mode = True
 
 # ============================================================================
 # MEDICATION SCHEMAS
@@ -197,6 +215,9 @@ class FeedingLogSchema(FeedingLogCreate):
     recorded_at: datetime
     created_at: datetime
 
+    class Config:
+        orm_mode = True
+
 # ============================================================================
 # MEDIA SCHEMAS
 # ============================================================================
@@ -227,6 +248,30 @@ class TimelineEventSchema(TimelineEventCreate):
     id: int
     bird_id: int
     created_at: datetime
+
+# ============================================================================
+# CALENDAR EVENT SCHEMAS
+# ============================================================================
+
+class CalendarEventCreate(BaseModel):
+    """Calendar event creation request"""
+    title: str
+    station_id: str
+    start_at: datetime
+    end_at: Optional[datetime] = None
+    all_day: bool = False
+    description: Optional[str] = None
+    location: Optional[str] = None
+    bird_id: Optional[int] = None
+
+class CalendarEventSchema(CalendarEventCreate):
+    """Calendar event response"""
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
 
 # ============================================================================
 # AI/RECOMMENDATION SCHEMAS

@@ -9,16 +9,25 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from contextlib import asynccontextmanager
 import logging
 from datetime import datetime, timedelta
+from typing import Optional, List
 
 from server.config import get_settings
 from server.auth import verify_token, create_access_token
 from server.database import init_db, get_db
 from server.gpu import GPUPool
 from server.llm import RaptorCareAI
-from server.models import User, Bird
+from server.sync import SyncManager
+from server.models import User, Bird, HealthRecord, Station, FeedingLog, CalendarEvent, BirdStatus
 from server.schemas import (
     TokenResponse,
     BirdSchema,
+    BirdCreate,
+    HealthRecordCreate,
+    HealthRecordSchema,
+    FeedingLogCreate,
+    FeedingLogSchema,
+    CalendarEventCreate,
+    CalendarEventSchema,
     ResearchPrompt,
     ResearchOutput,
     GPUStatusResponse,
@@ -93,7 +102,7 @@ async def health_check():
 
 @app.post("/birds", response_model=BirdSchema, tags=["Patients"])
 async def create_bird(
-    bird: BirdSchema,
+    bird: BirdCreate,
     token: str = Depends(oauth2_scheme),
     db = Depends(get_db)
 ):
@@ -102,8 +111,30 @@ async def create_bird(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # TODO: Implement bird creation
-    return bird
+    new_bird = Bird(
+        internal_id=bird.internal_id,
+        ring_number=bird.ring_number,
+        tag_id=bird.tag_id,
+        animal_class=bird.animal_class,
+        species=bird.species,
+        gender=bird.gender,
+        estimated_age=bird.estimated_age,
+        found_location=bird.found_location,
+        finder_name=bird.finder_name,
+        finder_contact=bird.finder_contact,
+        gps_lat=bird.gps_lat,
+        gps_lon=bird.gps_lon,
+        station_id=bird.station_id,
+        notes=bird.notes,
+        admission_date=datetime.utcnow(),
+        status=BirdStatus.IN_TREATMENT,
+    )
+
+    db.add(new_bird)
+    db.commit()
+    db.refresh(new_bird)
+
+    return new_bird
 
 @app.get("/birds/{bird_id}", response_model=BirdSchema, tags=["Patients"])
 async def get_bird(
@@ -116,32 +147,239 @@ async def get_bird(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # TODO: Implement bird retrieval
-    return {"id": bird_id}
+    bird = db.query(Bird).filter(Bird.id == bird_id).first()
+    if not bird:
+        raise HTTPException(status_code=404, detail="Bird not found")
+    return bird
 
 @app.get("/birds", tags=["Patients"])
 async def list_birds(
     skip: int = 0,
     limit: int = 100,
+    station_id: Optional[str] = None,
     token: str = Depends(oauth2_scheme),
     db = Depends(get_db)
 ):
-    """List all patients"""
+    """List all patients, optionally filtered by station."""
     user = verify_token(token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # TODO: Implement bird listing
-    return {"birds": [], "total": 0}
+    query = db.query(Bird)
+    if station_id:
+        query = query.filter(Bird.station_id == station_id)
+
+    total = query.count()
+    birds = query.offset(skip).limit(limit).all()
+    return {"birds": birds, "total": total}
+
+@app.post("/sync", tags=["Sync"])
+async def sync_station(
+    payload: dict,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Sync offline station actions with the server."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    station_id = payload.get("station_id")
+    actions = payload.get("actions", [])
+
+    if not station_id:
+        raise HTTPException(status_code=400, detail="station_id is required")
+
+    station = db.query(Station).filter(Station.station_id == station_id).first()
+    if not station:
+        station = Station(
+            station_id=station_id,
+            name=f"Station {station_id}",
+            location="Unknown"
+        )
+        db.add(station)
+        db.commit()
+
+    sync_manager = SyncManager(db)
+    processed_count = 0
+    errors = []
+
+    for action in actions:
+        action_type = action.get("action")
+        entity_type = action.get("entity_type")
+        entity_data = action.get("data", {})
+
+        if not action_type or not entity_type:
+            errors.append({"action": action, "error": "Missing action or entity_type"})
+            continue
+
+        if action_type == "create" and entity_type == "bird":
+            try:
+                bird = Bird(
+                    internal_id=entity_data.get("internal_id", f"unknown-{datetime.utcnow().timestamp()}"),
+                    ring_number=entity_data.get("ring_number"),
+                    tag_id=entity_data.get("tag_id"),
+                    animal_class=entity_data.get("animal_class", "bird"),
+                    species=entity_data.get("species", "other"),
+                    gender=entity_data.get("gender", "unknown"),
+                    estimated_age=entity_data.get("estimated_age"),
+                    found_location=entity_data.get("found_location"),
+                    finder_name=entity_data.get("finder_name"),
+                    finder_contact=entity_data.get("finder_contact"),
+                    gps_lat=entity_data.get("gps_lat"),
+                    gps_lon=entity_data.get("gps_lon"),
+                    station_id=station_id,
+                    notes=entity_data.get("notes"),
+                    admission_date=datetime.utcnow(),
+                    status=BirdStatus.IN_TREATMENT,
+                )
+                db.add(bird)
+                db.commit()
+                processed_count += 1
+            except Exception as exc:
+                db.rollback()
+                errors.append({"action": action, "error": str(exc)})
+
+        elif action_type == "create" and entity_type == "calendar_event":
+            try:
+                event = CalendarEvent(
+                    title=entity_data.get("title", "Untitled event"),
+                    station_id=station_id,
+                    bird_id=entity_data.get("bird_id"),
+                    description=entity_data.get("description"),
+                    start_at=datetime.fromisoformat(entity_data.get("start_at")) if entity_data.get("start_at") else datetime.utcnow(),
+                    end_at=datetime.fromisoformat(entity_data.get("end_at")) if entity_data.get("end_at") else None,
+                    all_day=entity_data.get("all_day", False),
+                    location=entity_data.get("location"),
+                )
+                db.add(event)
+                db.commit()
+                processed_count += 1
+            except Exception as exc:
+                db.rollback()
+                errors.append({"action": action, "error": str(exc)})
+
+        elif action_type == "create" and entity_type == "health_record":
+            try:
+                bird_id = entity_data.get("bird_id")
+                health_record = HealthRecord(
+                    bird_id=bird_id,
+                    weight_grams=entity_data.get("weight_grams"),
+                    general_condition=entity_data.get("general_condition"),
+                    behavior=entity_data.get("behavior"),
+                    hydration_status=entity_data.get("hydration_status"),
+                    injuries=entity_data.get("injuries"),
+                    medical_notes=entity_data.get("medical_notes"),
+                    parasites_detected=entity_data.get("parasites_detected", False),
+                    parasite_notes=entity_data.get("parasite_notes"),
+                    fecal_sample_taken=entity_data.get("fecal_sample_taken", False),
+                    lab_results=entity_data.get("lab_results"),
+                    recorded_at=datetime.fromisoformat(entity_data.get("recorded_at")) if entity_data.get("recorded_at") else datetime.utcnow(),
+                )
+                db.add(health_record)
+                db.commit()
+                processed_count += 1
+            except Exception as exc:
+                db.rollback()
+                errors.append({"action": action, "error": str(exc)})
+
+        else:
+            sync_success = sync_manager.enqueue_action(
+                station_id=station_id,
+                action=action_type,
+                entity_type=entity_type,
+                entity_data=entity_data,
+            )
+            if sync_success:
+                processed_count += 1
+            else:
+                errors.append({"action": action, "error": "Failed to enqueue action"})
+
+    return {
+        "success": len(errors) == 0,
+        "processed": processed_count,
+        "errors": errors,
+    }
+
+@app.get("/stations", tags=["Stations"])
+async def list_stations(
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """List all registered stations and sync queue status."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    stations = db.query(Station).all()
+    sync_manager = SyncManager(db)
+    station_list = []
+
+    for station in stations:
+        stats = sync_manager.get_queue_stats(station.station_id)
+        station_list.append({
+            "station_id": station.station_id,
+            "name": station.name,
+            "location": station.location,
+            "created_at": station.created_at.isoformat(),
+            "updated_at": station.updated_at.isoformat(),
+            "sync_stats": stats,
+        })
+
+    return {"stations": station_list}
+
+# ============================================================================
+# CALENDAR ENDPOINTS
+# ============================================================================
+
+@app.get("/calendar/events", response_model=List[CalendarEventSchema], tags=["Calendar"])
+async def list_calendar_events(
+    station_id: str,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """List calendar events for a station."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    events = db.query(CalendarEvent).filter(CalendarEvent.station_id == station_id).order_by(CalendarEvent.start_at).all()
+    return events
+
+@app.post("/calendar/events", response_model=CalendarEventSchema, tags=["Calendar"])
+async def create_calendar_event(
+    event_data: CalendarEventCreate,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Create or sync a calendar event."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    event = CalendarEvent(
+        title=event_data.title,
+        station_id=event_data.station_id,
+        bird_id=event_data.bird_id,
+        description=event_data.description,
+        start_at=event_data.start_at,
+        end_at=event_data.end_at,
+        all_day=event_data.all_day,
+        location=event_data.location,
+    )
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return event
 
 # ============================================================================
 # HEALTH RECORD ENDPOINTS
 # ============================================================================
 
-@app.post("/birds/{bird_id}/health-records", tags=["Health"])
+@app.post("/birds/{bird_id}/health-records", response_model=HealthRecordSchema, tags=["Health"])
 async def create_health_record(
     bird_id: int,
-    record_data: dict,
+    record_data: HealthRecordCreate,
     token: str = Depends(oauth2_scheme),
     db = Depends(get_db)
 ):
@@ -150,17 +388,39 @@ async def create_health_record(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # TODO: Implement health record creation
-    return {"status": "created", "bird_id": bird_id}
+    bird = db.query(Bird).filter(Bird.id == bird_id).first()
+    if not bird:
+        raise HTTPException(status_code=404, detail="Bird not found")
+
+    health_record = HealthRecord(
+        bird_id=bird_id,
+        weight_grams=record_data.weight_grams,
+        general_condition=record_data.general_condition,
+        behavior=record_data.behavior,
+        hydration_status=record_data.hydration_status,
+        injuries=record_data.injuries,
+        medical_notes=record_data.medical_notes,
+        parasites_detected=record_data.parasites_detected,
+        parasite_notes=record_data.parasite_notes,
+        fecal_sample_taken=record_data.fecal_sample_taken,
+        lab_results=record_data.lab_results,
+        recorded_at=datetime.utcnow(),
+    )
+
+    db.add(health_record)
+    db.commit()
+    db.refresh(health_record)
+
+    return health_record
 
 # ============================================================================
 # FEEDING LOG ENDPOINTS
 # ============================================================================
 
-@app.post("/birds/{bird_id}/feeding-logs", tags=["Feeding"])
+@app.post("/birds/{bird_id}/feeding-logs", response_model=FeedingLogSchema, tags=["Feeding"])
 async def create_feeding_log(
     bird_id: int,
-    log_data: dict,
+    log_data: FeedingLogCreate,
     token: str = Depends(oauth2_scheme),
     db = Depends(get_db)
 ):
@@ -169,8 +429,25 @@ async def create_feeding_log(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # TODO: Implement feeding log creation
-    return {"status": "created", "bird_id": bird_id}
+    bird = db.query(Bird).filter(Bird.id == bird_id).first()
+    if not bird:
+        raise HTTPException(status_code=404, detail="Bird not found")
+
+    feeding_log = FeedingLog(
+        bird_id=bird_id,
+        feed_type=log_data.feed_type,
+        amount_grams=log_data.amount_grams,
+        time_of_day=log_data.time_of_day,
+        food_consumed=log_data.food_consumed,
+        feeding_method=log_data.feeding_method,
+        notes=log_data.notes,
+    )
+
+    db.add(feeding_log)
+    db.commit()
+    db.refresh(feeding_log)
+
+    return feeding_log
 
 # ============================================================================
 # LLM INTEGRATION ENDPOINTS
@@ -187,25 +464,36 @@ async def get_ai_recommendations(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # TODO: Implement retrieval of bird data from the database
-    sample_bird = {
-        "species": "Unknown",
-        "weight": 0,
-        "status": "Unknown",
-        "behavior": "Unknown",
-        "hydration_status": "Unknown",
-        "days_in_care": 0,
-        "injury": "Unknown",
+    bird = db.query(Bird).filter(Bird.id == bird_id).first()
+    if not bird:
+        raise HTTPException(status_code=404, detail="Bird not found")
+
+    health_records = db.query(HealthRecord).filter(HealthRecord.bird_id == bird_id).order_by(HealthRecord.recorded_at.desc()).all()
+    health_history = [
+        {
+            "recorded_at": record.recorded_at.isoformat(),
+            "weight_grams": record.weight_grams,
+            "behavior": record.behavior,
+            "hydration_status": record.hydration_status,
+            "injuries": record.injuries,
+            "medical_notes": record.medical_notes,
+        }
+        for record in health_records
+    ]
+
+    bird_data = {
+        "species": bird.species.value if hasattr(bird.species, "value") else bird.species,
+        "status": bird.status.value if hasattr(bird.status, "value") else bird.status,
+        "estimated_age": bird.estimated_age,
+        "gender": bird.gender.value if hasattr(bird.gender, "value") else bird.gender,
+        "gps_lat": bird.gps_lat,
+        "gps_lon": bird.gps_lon,
+        "notes": bird.notes,
+        "station_id": bird.station_id,
     }
 
-    return {
-        "bird_id": bird_id,
-        "recommendations": [
-            "Ensure adequate hydration",
-            "Monitor weight daily"
-        ],
-        "prognosis": "Good recovery expected"
-    }
+    recommendations = ai.generate_care_recommendations(bird_data, health_history)
+    return {"recommendations": recommendations}
 
 @app.post("/research/summary", response_model=ResearchOutput, tags=["Research"])
 async def research_summary(

@@ -48,6 +48,21 @@ class StationClient:
         """)
 
         cursor.execute("""
+            CREATE TABLE IF NOT EXISTS calendar_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                station_id TEXT NOT NULL,
+                bird_id INTEGER,
+                description TEXT,
+                start_at TIMESTAMP NOT NULL,
+                end_at TIMESTAMP,
+                all_day INTEGER DEFAULT 0,
+                location TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS sync_queue (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 action TEXT,
@@ -134,6 +149,46 @@ class StationClient:
 
         except Exception as e:
             logger.error(f"❌ Failed to record health check: {str(e)}")
+            return False
+
+    def create_calendar_event_local(self, event_data: Dict) -> bool:
+        """Create a local calendar event and queue it for sync."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO calendar_events (
+                    title, station_id, bird_id, description, start_at, end_at, all_day, location
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                event_data.get("title"),
+                self.station_id,
+                event_data.get("bird_id"),
+                event_data.get("description"),
+                event_data.get("start_at"),
+                event_data.get("end_at"),
+                1 if event_data.get("all_day") else 0,
+                event_data.get("location"),
+            ))
+
+            cursor.execute("""
+                INSERT INTO sync_queue (action, entity_type, entity_data)
+                VALUES (?, ?, ?)
+            """, (
+                "create",
+                "calendar_event",
+                json.dumps(event_data)
+            ))
+
+            conn.commit()
+            conn.close()
+
+            logger.info(f"✅ Calendar event '{event_data.get('title')}' created locally")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Failed to create calendar event locally: {str(e)}")
             return False
 
     def sync_with_server(self, token: str) -> Dict:
