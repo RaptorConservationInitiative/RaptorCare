@@ -1,0 +1,8 @@
+INSERT INTO users
+(username, password_hash, role)
+VALUES
+(
+    'admin',
+    '$2b$12$GA3JmZnQk3qHYg2VfOR7e.AiAfVR3Vd19A4ZszwluSjAJOuCpnZMW',
+    'admin'
+);

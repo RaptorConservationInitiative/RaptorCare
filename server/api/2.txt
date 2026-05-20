@@ -1,0 +1,4 @@
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NzkyMjYyMTB9.v6_5_mbmlQ5etH0PVHBFriyU1DNlVYz_O6Lb8W9kKQw
+
+curl -b "token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NzkyMjYyMTB9.v6_5_mbmlQ5etH0PVHBFriyU1DNlVYz_O6Lb8W9kKQw
+" http://localhost:8000/animals/

@@ -1,5 +1,5 @@
 from fastapi import Request, HTTPException, Header
-from server.auth.jwt import verify_token, decode_token
+from server.auth.jwt import verify_token,
 """
 def require_user(request: Request):
 
@@ -36,7 +36,7 @@ def require_user(
         raise HTTPException(status_code=401, detail="Missing token")
 
     try:
-        payload = decode_token(token)
+        payload = verify_token(token)
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
