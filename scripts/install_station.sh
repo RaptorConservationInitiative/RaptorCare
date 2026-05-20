@@ -1,50 +1,34 @@
 #!/bin/bash
-# Station installation script (Client-side)
+# RaptorCare Station Client Installation Script
+# Offline-first client for rescue station
 
 set -e
 
-echo "🦅 RaptorCare Station Client Installer"
-echo "======================================="
+echo "🦅 RaptorCare Station Client Installation"
+echo "========================================="
 
-# Update system
-echo "📦 Updating system packages..."
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo -e "${YELLOW}[1/3] Updating system packages...${NC}"
 apt-get update
-apt-get upgrade -y
+apt-get install -y python3 python3-venv python3-dev git
 
-# Install system dependencies
-echo "📦 Installing system dependencies..."
-apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
-    sqlite3 \
-    node.js \
-    npm \
-    git \
-    curl
-
-# Create venv
-echo "🐍 Creating Python virtual environment..."
+echo -e "${YELLOW}[2/3] Creating Python virtual environment...${NC}"
 python3 -m venv /opt/raptorcare-station/venv
-source /opt/raptorcare-station/venv/bin/activate
+/opt/raptorcare-station/venv/bin/pip install --upgrade pip setuptools wheel
 
-# Install Python dependencies
-echo "📦 Installing Python packages..."
-pip install --upgrade pip setuptools wheel
-pip install -r /opt/raptorcare-station/requirements.txt
+echo -e "${YELLOW}[3/3] Installing Python dependencies...${NC}"
+if [ -f requirements.txt ]; then
+    /opt/raptorcare-station/venv/bin/pip install -r requirements.txt
+fi
 
-# Setup frontend
-echo "📱 Setting up React frontend..."
-cd /opt/raptorcare-station/frontend
-npm install
-npm run build
-
-echo "✅ Station installation complete!"
 echo ""
-echo "Next steps:"
-echo "1. Configure station connection:"
-echo "   export REACT_APP_API_URL=http://server-ip:8000"
+echo -e "${GREEN}✅ Station Client installed!${NC}"
 echo ""
-echo "2. Start the application:"
-echo "   cd /opt/raptorcare-station"
-echo "   npm start"
+echo "Usage:"
+echo "  /opt/raptorcare-station/venv/bin/python station/client.py"
+echo ""

@@ -1,269 +1,227 @@
 """
-LLM Integration - Ollama-basierte KI für Pflege- und Reha-Empfehlungen
+LLM Integration with Ollama
+Provides RaptorCare AI for care recommendations and analysis
 """
 
-import requests
 import logging
-from typing import Optional, List
-from datetime import datetime
-from langchain.llms.ollama import Ollama
-from langchain.callbacks.manager import CallbackManager
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-
+import requests
+from typing import Optional, Dict
 from server.config import get_settings
+from server.gpu import GPUPool, GPUType
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+
 class RaptorCareAI:
-    """Interface to Ollama LLM for care recommendations"""
+    """
+    Main LLM interface using Ollama
+    Runs on GPU 0 (T600/GTX 1650)
+    """
 
     def __init__(self):
         self.base_url = settings.OLLAMA_BASE_URL
         self.model = settings.OLLAMA_MODEL
+        self.gpu_id = GPUPool.select_best_gpu(GPUType.LLM)
 
+        # Ensure GPU 0 is set
+        GPUPool.set_device(self.gpu_id)
+        logger.info(f"🤖 RaptorCareAI initialized on GPU {self.gpu_id}")
+
+    def _call_ollama(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
+        """Call Ollama API with prompt"""
         try:
-            # Initialize LLM with streaming
-            self.llm = Ollama(
-                base_url=self.base_url,
-                model=self.model,
-                callback_manager=CallbackManager(
-                    [StreamingStdOutCallbackHandler()]
-                ),
-                temperature=0.3,  # Low temperature for consistent recommendations
-                top_p=0.9,
+            response = requests.post(
+                f"{self.base_url}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "temperature": 0.7,
+                    "top_p": 0.9
+                },
+                timeout=60
             )
-            logger.info(f"✅ Ollama LLM initialized: {self.model} at {self.base_url}")
+            response.raise_for_status()
+            return response.json().get("response", "")
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Ollama LLM: {str(e)}")
-            self.llm = None
+            logger.error(f"Ollama API error: {e}")
+            return None
 
-    def check_connection(self) -> bool:
-        """Check if Ollama server is reachable"""
-        try:
-            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
-            return response.status_code == 200
-        except Exception as e:
-            logger.error(f"❌ Ollama connection failed: {str(e)}")
-            return False
-
-    def get_care_recommendations(self, bird_context: dict) -> dict:
-        """
-        Generate care recommendations for a specific bird
-
-        bird_context should contain:
-        - species
-        - current_status
-        - weight_history
-        - recent_health_issues
-        - medications
-        - feeding_history
-        """
-
-        if not self.llm:
-            logger.warning("LLM not initialized, returning default recommendations")
-            return self._default_recommendations()
-
-        try:
-            # Build context prompt
-            prompt = self._build_care_prompt(bird_context)
-
-            # Generate recommendation
-            logger.info(f"Generating care recommendations for bird {bird_context.get('id')}")
-            response = self.llm.invoke(prompt)
-
-            return {
-                "success": True,
-                "recommendations": response,
-                "confidence": 0.85,
-                "generated_at": datetime.now().isoformat()
-            }
-
-        except Exception as e:
-            logger.error(f"❌ Recommendation generation failed: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "fallback": self._default_recommendations()
-            }
-
-    def get_rehabilitation_prognosis(self, bird_context: dict) -> dict:
-        """
-        Predict rehabilitation prognosis based on bird history
-
-        Returns: {prognosis, success_probability, estimated_timeline, risk_factors}
-        """
-
-        if not self.llm:
-            logger.warning("LLM not initialized, returning default prognosis")
-            return self._default_prognosis()
-
-        try:
-            prompt = self._build_prognosis_prompt(bird_context)
-
-            logger.info(f"Generating prognosis for bird {bird_context.get('id')}")
-            response = self.llm.invoke(prompt)
-
-            return {
-                "success": True,
-                "prognosis": response,
-                "confidence": 0.75,
-                "generated_at": datetime.now().isoformat()
-            }
-
-        except Exception as e:
-            logger.error(f"❌ Prognosis generation failed: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "fallback": self._default_prognosis()
-            }
-
-    def detect_health_anomalies(self, health_history: List[dict]) -> dict:
-        """
-        Analyze health records for anomalies and trends
-
-        health_history: List of daily health records with weight, behavior, etc.
-        """
-
-        if not self.llm:
-            logger.warning("LLM not initialized, returning default anomaly detection")
-            return {"anomalies": [], "trends": []}
-
-        try:
-            prompt = self._build_anomaly_detection_prompt(health_history)
-
-            logger.info("Analyzing health records for anomalies")
-            response = self.llm.invoke(prompt)
-
-            return {
-                "success": True,
-                "analysis": response,
-                "generated_at": datetime.now().isoformat()
-            }
-
-        except Exception as e:
-            logger.error(f"❌ Anomaly detection failed: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "anomalies": [],
-                "trends": []
-            }
-
-    # ========================================================================
-    # PROMPT BUILDERS
-    # ========================================================================
-
-    def _build_care_prompt(self, bird_context: dict) -> str:
-        """Build detailed care recommendation prompt"""
-
-        species = bird_context.get("species", "Unknown")
-        status = bird_context.get("status", "In treatment")
-        weight = bird_context.get("recent_weight", "Unknown")
-        health_issues = bird_context.get("health_issues", [])
-        medications = bird_context.get("medications", [])
+    def generate_care_recommendations(self, bird_data: Dict) -> str:
+        """Generate daily care recommendations (DEUTSCH)"""
 
         prompt = f"""
-# RaptorCare Pflegeempfehlungen
+Du bist ein Experte für Greifvogel-Rehabilitation in Auffangstationen.
+Basierend auf den folgenden Tierdaten, gebe detaillierte deutsche Pflege-Empfehlungen:
 
-## Patienteninformation
-- **Art**: {species}
-- **Status**: {status}
-- **Gewicht**: {weight}g
-- **Aktuelle Gesundheitsprobleme**: {', '.join(health_issues) if health_issues else 'Keine'}
-- **Medikamente**: {', '.join(medications) if medications else 'Keine'}
+🦅 **Tierdaten:**
+- Art: {bird_data.get('species', 'Unbekannt')}
+- Gewicht: {bird_data.get('weight', 'Unbekannt')} g
+- Verhalten: {bird_data.get('behavior', 'Unbekannt')}
+- Hydration: {bird_data.get('hydration_status', 'Unbekannt')}
+- Tage in Pflege: {bird_data.get('days_in_care', 'Unbekannt')}
 
-## Aufgabe
-Gib konkrete, praktikable Pflegeempfehlungen für diesen Greifvogel basierend auf seiner Art, seinem Status und seinen Gesundheitsproblemen.
+📋 **Geben Sie konkrete Empfehlungen für:**
+1. Futtertyp und Menge
+2. Aktivitätsförderung
+3. Medizinische Überwachung
+4. Gehege-Anforderungen
+5. Auswilderungs-Readiness-Indikationen
 
-Strukturiere deine Antwort wie folgt:
-1. **Fütterung**: Empfohlener Futtertyp, Menge, Häufigkeit
-2. **Unterbringung**: Gehegeanforderungen und Umweltbedingungen
-3. **Tägliche Beobachtung**: Worauf man achten sollte
-4. **Vorbeugungsmaßnahmen**: Infektionsprävention und Stressabbau
-5. **Auswilderungsvorbereitung**: Falls relevant
-
-Antworte prägnant und medizinisch korrekt.
+Antworte kurz und präzise auf Englisch.
 """
-        return prompt
 
-    def _build_prognosis_prompt(self, bird_context: dict) -> str:
-        """Build rehabilitation prognosis prompt"""
+        result = self._call_ollama(prompt)
+        return result or "Empfehlung konnte nicht generiert werden."
 
-        species = bird_context.get("species", "Unknown")
-        days_in_care = bird_context.get("days_in_care", 0)
-        injuries = bird_context.get("injuries", [])
-        weight_change = bird_context.get("weight_change_percent", 0)
+    def generate_feeding_plan(self, bird_data: Dict) -> str:
+        """Generate feeding plan (DEUTSCH)"""
 
         prompt = f"""
-# Rehabilitationsprognose
+Du bist ein Spezialist für Greifvogel-Ernährung.
+Erstelle einen detaillierten Fütterungsplan für folgendes Tier:
 
-## Patientenhistorie
-- **Art**: {species}
-- **Tage in Pflege**: {days_in_care}
-- **Verletzungen**: {', '.join(injuries) if injuries else 'Keine bekannt'}
-- **Gewichtsentwicklung**: {weight_change:+.1f}%
+🦅 Spezies: {bird_data.get('species', 'Unbekannt')}
+📊 Gewicht: {bird_data.get('weight', 'Unbekannt')} g
+🎯 Rehabilitationsstatus: {bird_data.get('status', 'Unbekannt')}
 
-## Analyse
-Beurteile basierend auf dieser Information:
-1. Die Wahrscheinlichkeit einer erfolgreichen Auswilderung (0-100%)
-2. Den geschätzten Zeithorizont bis zur Auswilderung
-3. Potenzielle Komplikationen oder Risikofaktoren
-4. Empfohlene Maßnahmen zur Optimierung der Erfolgsaussichten
+Bitte geben Sie an:
+1. Empfohlene Beutetiere (ganz/gehackt)
+2. Tägliche Futtermenge
+3. Fütterungsfrequenz
+4. Fütterungsmethode (eigenständig/unterstützt)
+5. Ernährungsziele für diese Woche
 
-Antworte fachlich und realistisch.
+Antworte auf Englisch.
 """
-        return prompt
 
-    def _build_anomaly_detection_prompt(self, health_history: List[dict]) -> str:
-        """Build health anomaly detection prompt"""
+        result = self._call_ollama(prompt)
+        return result or "Fütterungsplan konnte nicht generiert werden."
 
-        # Vereinfachte Zusammenfassung der letzten 7 Tage
-        summary = "\n".join([
-            f"Tag {i+1}: Gewicht {r.get('weight')}g, Status: {r.get('condition')}"
-            for i, r in enumerate(health_history[-7:])
+    def analyze_health_anomalies(self, health_records: list) -> str:
+        """Analyze health trends for anomalies (DEUTSCH)"""
+
+        # Prepare health summary
+        health_summary = "\n".join([
+            f"  - {record.get('date')}: Gewicht {record.get('weight')}g, "
+            f"Verhalten: {record.get('behavior')}"
+            for record in health_records[-7:]  # Last 7 records
         ])
 
         prompt = f"""
-# Anomalieerkennung
+Du bist ein Tierarzt spezialisiert auf Greifvögel.
+Analysiere die folgenden Gesundheitsdaten und identifiziere potenzielle Probleme:
 
-## Letzte Gesundheitseinträge (7 Tage)
-{summary}
+📅 **Letzte 7 Tage Gesundheitsverlauf:**
+{health_summary}
 
-## Aufgabe
-Analysiere diese Gesundheitsdaten und identifiziere:
-1. **Auffällige Trends**: Gewichtsverlust, Verhaltensänderungen
-2. **Potenzielle Probleme**: Worauf sollte der Pfleger achten?
-3. **Empfohlene Maßnahmen**: Sollte ein Tierarzt hinzugezogen werden?
+🔍 Bitte identifizieren Sie:
+1. Gewichtstrends (Zu- oder Abnahme?)
+2. Verhaltensmuster (Normal/Auffällig?)
+3. Mögliche Gesundheitsprobleme
+4. Empfohlene Maßnahmen
 
-Antworte prägnant und actionsorientiert.
+Antworte präzise auf Englisch.
 """
-        return prompt
 
-    def _default_recommendations(self) -> dict:
-        """Default recommendations when LLM is unavailable"""
+        result = self._call_ollama(prompt)
+        return result or "Analyse konnte nicht durchgeführt werden."
+
+    def estimate_release_prognosis(self, bird_data: Dict, health_history: list) -> str:
+        """Estimate prognosis for release (DEUTSCH)"""
+
+        days_in_care = bird_data.get('days_in_care', 0)
+
+        prompt = f"""
+Du bist ein erfahrener Greifvogel-Rehabber mit 20 Jahren Erfahrung.
+Schätze die Wahrscheinlichkeit einer erfolgreichen Auswilderung:
+
+🦅 **Tier:**
+- Art: {bird_data.get('species', 'Unbekannt')}
+- Aktuelle Gewicht: {bird_data.get('weight', 'Unbekannt')} g
+- In Pflege seit: {days_in_care} Tagen
+- Ursprüngliche Verletzung: {bird_data.get('injury', 'Unbekannt')}
+
+📊 **Gesundheitstrend:**
+{health_history[:3] if health_history else "Keine Daten"}
+
+🎯 **Bitte geben Sie an:**
+1. Auswilderungs-Wahrscheinlichkeit (Prozentsatz)
+2. Empfohlene Auswilderungszeitpunkt
+3. Noch erforderliche Trainings
+4. Potenzielle Risiken bei Auswilderung
+
+Antworte auf Englisch.
+"""
+
+        result = self._call_ollama(prompt)
+        return result or "Prognose konnte nicht generiert werden."
+
+
+class NeuralNetworkProcessor:
+    """
+    Neural Network tasks running on GPU 1
+    Image analysis, sensor data processing, pattern recognition
+    """
+
+    def __init__(self):
+        self.gpu_id = GPUPool.select_best_gpu(GPUType.NEURAL_NET)
+        GPUPool.set_device(self.gpu_id)
+        logger.info(f"🧠 NeuralNetworkProcessor initialized on GPU {self.gpu_id}")
+
+    def analyze_image(self, image_path: str) -> Dict:
+        """
+        Analyze bird image
+        TODO: Implement with torchvision or similar
+        """
+        logger.info(f"🖼️ Analyzing image on GPU {self.gpu_id}: {image_path}")
+
         return {
-            "feeding": "Angepasstes Futterangebot basierend auf Art und Gewicht",
-            "housing": "Ruhige, sichere Unterbringung mit Flugmöglichkeit",
-            "monitoring": "Tägliche Gewichtskontrolle, Beobachtung des Verhaltens",
-            "prevention": "Hygiene, Stressabbau, Sozialisation vorbereiten"
+            "status": "success",
+            "gpu_used": self.gpu_id,
+            "analysis": {
+                "species_detected": "Wanderfalke",
+                "health_indicators": "Good plumage condition",
+                "injury_detection": "No visible injuries"
+            }
         }
 
-    def _default_prognosis(self) -> dict:
-        """Default prognosis when LLM is unavailable"""
+    def process_sensor_data(self, sensor_data: Dict) -> Dict:
+        """
+        Process IoT sensor data (temperature, humidity, movement)
+        TODO: Implement pattern recognition
+        """
+        logger.info(f"📊 Processing sensor data on GPU {self.gpu_id}")
+
         return {
-            "probability": "Basierend auf Artenspezifika und Verlauf zu bewerten",
-            "timeline": "Typischerweise 4-12 Wochen Rehabilitation",
-            "risks": "Infektionen, unzureichende Fitness, Verhaltensprobleme"
+            "status": "success",
+            "gpu_used": self.gpu_id,
+            "anomalies_detected": []
         }
 
-# Global LLM instance
-_llm_instance: Optional[RaptorCareAI] = None
 
-def get_llm() -> RaptorCareAI:
-    """Get or create global LLM instance"""
-    global _llm_instance
-    if _llm_instance is None:
-        _llm_instance = RaptorCareAI()
-    return _llm_instance
+# Example usage
+if __name__ == "__main__":
+    # Test LLM
+    ai = RaptorCareAI()
+
+    bird_data = {
+        "species": "Wanderfalke",
+        "weight": 900,
+        "behavior": "Alert, frisst gut",
+        "hydration_status": "Gut",
+        "days_in_care": 5
+    }
+
+    print("📋 Care Recommendations:")
+    rec = ai.generate_care_recommendations(bird_data)
+    print(rec)
+
+    print("\n🍗 Feeding Plan:")
+    feed = ai.generate_feeding_plan(bird_data)
+    print(feed)
+
+    # Test GPU status
+    print("\n🎮 GPU Status:")
+    GPUPool.print_gpu_status()

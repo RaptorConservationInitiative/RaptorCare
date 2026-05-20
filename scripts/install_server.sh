@@ -1,75 +1,89 @@
 #!/bin/bash
-# Server installation script for Proxmox LXC
+
+# RaptorCare Installation Script for Proxmox LXC
+# Installs all dependencies and services
 
 set -e
 
-echo "🦅 RaptorCare Server Installer"
-echo "================================"
+echo "🦅 RaptorCare Installation"
+echo "===================================="
 
 # Update system
 echo "📦 Updating system packages..."
 apt-get update
-apt-get upgrade -y
+apt-get install -y python3.11 python3-pip python3-venv git curl wget
 
-# Install system dependencies
-echo "📦 Installing system dependencies..."
-apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
-    postgresql \
-    postgresql-contrib \
-    git \
-    curl \
-    wget \
-    supervisor
+# Create installation directory
+if [ ! -d "/opt/raptorcare" ]; then
+    echo "📁 Creating /opt/raptorcare..."
+    mkdir -p /opt/raptorcare
+    cd /opt/raptorcare
+else
+    cd /opt/raptorcare
+fi
 
-# Create venv
-echo "🐍 Creating Python virtual environment..."
-python3 -m venv /opt/raptorcare/venv
-source /opt/raptorcare/venv/bin/activate
+# Clone repository (if not already done)
+if [ ! -d ".git" ]; then
+    echo "📥 Cloning RaptorCare repository..."
+    git clone https://github.com/RaptorConservationInitiative/RaptorCare.git .
+fi
 
-# Install Python dependencies
-echo "📦 Installing Python packages..."
-pip install --upgrade pip setuptools wheel
-pip install -r /opt/raptorcare/requirements.txt
+# Create Python virtual environment
+if [ ! -d "venv" ]; then
+    echo "🐍 Creating Python virtual environment..."
+    python3.11 -m venv venv
+    source venv/bin/activate
+    pip install --upgrade pip setuptools wheel
+    pip install -r requirements.txt
+    echo "✅ Virtual environment created"
+else
+    echo "✅ Virtual environment already exists"
+fi
 
-# Setup PostgreSQL
-echo "🗄️  Setting up PostgreSQL..."
-sudo -u postgres psql <<EOF
-CREATE USER raptorcare WITH PASSWORD 'raptorcare_password';
-CREATE DATABASE raptorcare_db OWNER raptorcare;
-GRANT ALL PRIVILEGES ON DATABASE raptorcare_db TO raptorcare;
-EOF
+# Install PostgreSQL client (for connection)
+echo "🐘 Installing PostgreSQL client..."
+apt-get install -y postgresql-client libpq-dev
 
-# Setup supervisor
-echo "⚙️  Setting up supervisor..."
-cat > /etc/supervisor/conf.d/raptorcare.conf << 'EOF'
-[program:raptorcare-server]
-command=/opt/raptorcare/venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 8000
-directory=/opt/raptorcare
-user=www-data
-autostart=true
-autorestart=true
-stderr_logfile=/var/log/raptorcare/server.err.log
-stdout_logfile=/var/log/raptorcare/server.out.log
-EOF
+# Install NVIDIA GPU utilities (if NVIDIA GPU present)
+if command -v nvidia-smi &> /dev/null; then
+    echo "🎮 NVIDIA GPU detected"
+    echo "✅ CUDA support available"
+else
+    echo "⚠️  No NVIDIA GPU detected - ensure nvidia-docker is installed"
+fi
 
-mkdir -p /var/log/raptorcare
-chown www-data:www-data /var/log/raptorcare
+# Install Ollama
+echo "🤖 Installing Ollama..."
+if command -v ollama &> /dev/null; then
+    echo "✅ Ollama already installed"
+else
+    curl https://ollama.ai/install.sh | sh
+    echo "✅ Ollama installed"
+fi
 
-echo "✅ Installation complete!"
+# Create .env file if it doesn't exist
+if [ ! -f ".env" ]; then
+    echo "📝 Creating .env file..."
+    cp .env.example .env
+    echo "⚠️  Please edit .env with your configuration:"
+    echo "   nano .env"
+fi
+
 echo ""
-echo "Next steps:"
-echo "1. Configure .env file:"
-echo "   cp .env.example .env"
-echo "   nano .env"
+echo "✨ Installation Complete!"
 echo ""
-echo "2. Initialize database:"
-echo "   source /opt/raptorcare/venv/bin/activate"
-echo "   python -c 'from server.database import init_db; init_db()'"
+echo "🚀 Next Steps:"
+echo "   1. Edit .env configuration:"
+echo "      nano .env"
 echo ""
-echo "3. Start services:"
-echo "   supervisorctl reread"
-echo "   supervisorctl update"
-echo "   supervisorctl start raptorcare-server"
+echo "   2. Setup systemd services:"
+echo "      sudo bash scripts/setup_systemd.sh"
+echo ""
+echo "   3. Start services:"
+echo "      sudo systemctl start raptorcare"
+echo "      sudo systemctl start ollama"
+echo ""
+echo "   4. Check status:"
+echo "      sudo systemctl status raptorcare"
+echo "      journalctl -u raptorcare -f"
+echo ""
