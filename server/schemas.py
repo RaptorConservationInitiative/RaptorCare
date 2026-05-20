@@ -4,7 +4,7 @@ Pydantic schemas for API request/response validation
 
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from enum import Enum
 
 # ============================================================================
@@ -45,6 +45,31 @@ class TokenResponse(BaseModel):
     """OAuth2 token response"""
     access_token: str
     token_type: str = "bearer"
+
+class ResearchPrompt(BaseModel):
+    """Payload for research and analysis requests"""
+    bird_data: Optional[Dict[str, Any]] = None
+    health_history: Optional[List[Dict[str, Any]]] = None
+    notes: Optional[str] = None
+    research_goal: Optional[str] = None
+
+class ResearchOutput(BaseModel):
+    """Response for research and LLM analysis endpoints"""
+    research_text: str
+    gpu_used: Optional[int] = None
+    model: Optional[str] = None
+
+class GPUInfoSchema(BaseModel):
+    device_id: int
+    name: str
+    total_memory_gb: float
+    used_memory_gb: float
+    free_memory_gb: float
+    utilization_percent: float
+
+class GPUStatusResponse(BaseModel):
+    gpu_count: int
+    gpus: List[GPUInfoSchema]
 
 class UserCreate(BaseModel):
     """User creation request"""

@@ -1,0 +1,98 @@
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: #f7f9fc;
+  color: #0f172a;
+}
+
+.container {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+header h1 {
+  margin: 0 0 10px;
+  font-size: 2.4rem;
+}
+
+header p {
+  margin: 0 0 22px;
+  color: #475569;
+}
+
+section {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 22px;
+  margin-bottom: 22px;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+}
+
+h2 {
+  margin-top: 0;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+input,
+textarea,
+select {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  background: #f8fafc;
+}
+
+button {
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 18px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+button.primary {
+  min-width: 180px;
+}
+
+.card {
+  background: #f1f5f9;
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.gpu-list {
+  display: grid;
+  gap: 14px;
+}
+
+pre {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 16px;
+  overflow-x: auto;
+  min-height: 80px;
+}
+
+.button-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}

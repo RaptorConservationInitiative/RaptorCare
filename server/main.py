@@ -13,14 +13,23 @@ from datetime import datetime, timedelta
 from server.config import get_settings
 from server.auth import verify_token, create_access_token
 from server.database import init_db, get_db
+from server.gpu import GPUPool
+from server.llm import RaptorCareAI
 from server.models import User, Bird
-from server.schemas import TokenResponse, BirdSchema
+from server.schemas import (
+    TokenResponse,
+    BirdSchema,
+    ResearchPrompt,
+    ResearchOutput,
+    GPUStatusResponse,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
+ai = RaptorCareAI()
 
 # Lifespan event handlers
 @asynccontextmanager
@@ -178,7 +187,17 @@ async def get_ai_recommendations(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # TODO: Integrate Ollama LLM for recommendations
+    # TODO: Implement retrieval of bird data from the database
+    sample_bird = {
+        "species": "Unknown",
+        "weight": 0,
+        "status": "Unknown",
+        "behavior": "Unknown",
+        "hydration_status": "Unknown",
+        "days_in_care": 0,
+        "injury": "Unknown",
+    }
+
     return {
         "bird_id": bird_id,
         "recommendations": [
@@ -187,6 +206,78 @@ async def get_ai_recommendations(
         ],
         "prognosis": "Good recovery expected"
     }
+
+@app.post("/research/summary", response_model=ResearchOutput, tags=["Research"])
+async def research_summary(
+    payload: ResearchPrompt,
+    token: str = Depends(oauth2_scheme)
+):
+    """Generate a research summary for a case or bird dataset."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    research_text = ai.generate_research_summary(
+        bird_data=payload.bird_data or {},
+        health_history=payload.health_history or [],
+        notes=payload.research_goal or payload.notes,
+    )
+
+    return {
+        "research_text": research_text,
+        "gpu_used": ai.gpu_id,
+        "model": settings.OLLAMA_MODEL,
+    }
+
+@app.post("/research/hypotheses", response_model=ResearchOutput, tags=["Research"])
+async def research_hypotheses(
+    payload: ResearchPrompt,
+    token: str = Depends(oauth2_scheme)
+):
+    """Generate research hypotheses from bird data and trends."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    research_text = ai.generate_research_hypotheses(
+        bird_data=payload.bird_data or {},
+        health_history=payload.health_history or [],
+    )
+
+    return {
+        "research_text": research_text,
+        "gpu_used": ai.gpu_id,
+        "model": settings.OLLAMA_MODEL,
+    }
+
+@app.post("/research/literature", response_model=ResearchOutput, tags=["Research"])
+async def research_literature(
+    payload: ResearchPrompt,
+    token: str = Depends(oauth2_scheme)
+):
+    """Summarize research or literature text for scientific use."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not payload.notes:
+        raise HTTPException(status_code=400, detail="notes field is required for literature summarization")
+
+    research_text = ai.summarize_literature(payload.notes)
+    return {
+        "research_text": research_text,
+        "gpu_used": ai.gpu_id,
+        "model": settings.OLLAMA_MODEL,
+    }
+
+@app.get("/research/gpu-status", response_model=GPUStatusResponse, tags=["Research"])
+async def research_gpu_status(token: str = Depends(oauth2_scheme)):
+    """Return current GPU utilization and role assignment."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    return GPUPool.get_memory_summary()
 
 # ============================================================================
 # STATUS ENDPOINTS

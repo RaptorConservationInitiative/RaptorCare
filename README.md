@@ -64,6 +64,13 @@
 
 ---
 
+## 🖥️ User Interfaces
+
+- `station_ui/` — Offline-capable station app for data entry, local queueing and sync with the central server.
+- `server_ui/` — Central dashboard for reviewing data from all stations, GPU status and research/LLM tools.
+
+---
+
 ## 🏗️ Architecture
 ┌──────────────────��──────────────────────────────────────────┐ │ RaptorCare Ecosystem │ └─────────────────────────────────────────────────────────────┘
 

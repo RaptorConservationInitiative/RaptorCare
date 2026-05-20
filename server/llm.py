@@ -49,114 +49,216 @@ class RaptorCareAI:
             return None
 
     def generate_care_recommendations(self, bird_data: Dict) -> str:
-        """Generate daily care recommendations (DEUTSCH)"""
+        """Generate daily care recommendations."""
 
         prompt = f"""
-Du bist ein Experte für Greifvogel-Rehabilitation in Auffangstationen.
-Basierend auf den folgenden Tierdaten, gebe detaillierte deutsche Pflege-Empfehlungen:
+You are an expert in raptor rehabilitation at a wildlife rescue station.
+Based on the following bird data, provide detailed care recommendations in English:
 
-🦅 **Tierdaten:**
-- Art: {bird_data.get('species', 'Unbekannt')}
-- Gewicht: {bird_data.get('weight', 'Unbekannt')} g
-- Verhalten: {bird_data.get('behavior', 'Unbekannt')}
-- Hydration: {bird_data.get('hydration_status', 'Unbekannt')}
-- Tage in Pflege: {bird_data.get('days_in_care', 'Unbekannt')}
+🦅 **Bird data:**
+- Species: {bird_data.get('species', 'Unknown')}
+- Weight: {bird_data.get('weight', 'Unknown')} g
+- Behavior: {bird_data.get('behavior', 'Unknown')}
+- Hydration status: {bird_data.get('hydration_status', 'Unknown')}
+- Days in care: {bird_data.get('days_in_care', 'Unknown')}
 
-📋 **Geben Sie konkrete Empfehlungen für:**
-1. Futtertyp und Menge
-2. Aktivitätsförderung
-3. Medizinische Überwachung
-4. Gehege-Anforderungen
-5. Auswilderungs-Readiness-Indikationen
+📋 **Provide specific guidance for:**
+1. Diet and meal size
+2. Activity support
+3. Medical monitoring
+4. Enclosure requirements
+5. Release readiness indicators
 
-Antworte kurz und präzise auf Englisch.
+Answer clearly and concisely in English.
 """
 
         result = self._call_ollama(prompt)
-        return result or "Empfehlung konnte nicht generiert werden."
+        return result or "Recommendation could not be generated."
 
     def generate_feeding_plan(self, bird_data: Dict) -> str:
-        """Generate feeding plan (DEUTSCH)"""
+        """Generate a feeding plan."""
 
         prompt = f"""
-Du bist ein Spezialist für Greifvogel-Ernährung.
-Erstelle einen detaillierten Fütterungsplan für folgendes Tier:
+You are a specialist in raptor nutrition.
+Create a detailed feeding plan for the following bird:
 
-🦅 Spezies: {bird_data.get('species', 'Unbekannt')}
-📊 Gewicht: {bird_data.get('weight', 'Unbekannt')} g
-🎯 Rehabilitationsstatus: {bird_data.get('status', 'Unbekannt')}
+🦅 Species: {bird_data.get('species', 'Unknown')}
+📊 Weight: {bird_data.get('weight', 'Unknown')} g
+🎯 Rehabilitation status: {bird_data.get('status', 'Unknown')}
 
-Bitte geben Sie an:
-1. Empfohlene Beutetiere (ganz/gehackt)
-2. Tägliche Futtermenge
-3. Fütterungsfrequenz
-4. Fütterungsmethode (eigenständig/unterstützt)
-5. Ernährungsziele für diese Woche
+Please include:
+1. Recommended prey type (whole/chopped)
+2. Daily food amount
+3. Feeding frequency
+4. Feeding method (independent/assisted)
+5. Nutrition goals for this week
 
-Antworte auf Englisch.
+Answer in English.
 """
 
         result = self._call_ollama(prompt)
-        return result or "Fütterungsplan konnte nicht generiert werden."
+        return result or "Feeding plan could not be generated."
 
     def analyze_health_anomalies(self, health_records: list) -> str:
-        """Analyze health trends for anomalies (DEUTSCH)"""
+        """Analyze health trends for anomalies."""
 
         # Prepare health summary
         health_summary = "\n".join([
-            f"  - {record.get('date')}: Gewicht {record.get('weight')}g, "
-            f"Verhalten: {record.get('behavior')}"
+            f"  - {record.get('date')}: Weight {record.get('weight')}g, "
+            f"Behavior: {record.get('behavior')}"
             for record in health_records[-7:]  # Last 7 records
         ])
 
         prompt = f"""
-Du bist ein Tierarzt spezialisiert auf Greifvögel.
-Analysiere die folgenden Gesundheitsdaten und identifiziere potenzielle Probleme:
+You are a veterinarian specializing in raptors.
+Analyze the following health data and identify potential concerns:
 
-📅 **Letzte 7 Tage Gesundheitsverlauf:**
+📅 **Last 7 days of health records:**
 {health_summary}
 
-🔍 Bitte identifizieren Sie:
-1. Gewichtstrends (Zu- oder Abnahme?)
-2. Verhaltensmuster (Normal/Auffällig?)
-3. Mögliche Gesundheitsprobleme
-4. Empfohlene Maßnahmen
+🔍 Please identify:
+1. Weight trends (gain or loss?)
+2. Behavior patterns (normal/abnormal?)
+3. Possible health issues
+4. Recommended actions
 
-Antworte präzise auf Englisch.
+Answer concisely in English.
 """
 
         result = self._call_ollama(prompt)
-        return result or "Analyse konnte nicht durchgeführt werden."
+        return result or "Analysis could not be completed."
 
     def estimate_release_prognosis(self, bird_data: Dict, health_history: list) -> str:
-        """Estimate prognosis for release (DEUTSCH)"""
+        """Estimate prognosis for release."""
 
         days_in_care = bird_data.get('days_in_care', 0)
 
         prompt = f"""
-Du bist ein erfahrener Greifvogel-Rehabber mit 20 Jahren Erfahrung.
-Schätze die Wahrscheinlichkeit einer erfolgreichen Auswilderung:
+You are an experienced raptor rehabilitation specialist with 20 years of field work.
+Estimate the likelihood of a successful release:
 
-🦅 **Tier:**
-- Art: {bird_data.get('species', 'Unbekannt')}
-- Aktuelle Gewicht: {bird_data.get('weight', 'Unbekannt')} g
-- In Pflege seit: {days_in_care} Tagen
-- Ursprüngliche Verletzung: {bird_data.get('injury', 'Unbekannt')}
+🦅 **Bird:**
+- Species: {bird_data.get('species', 'Unknown')}
+- Current weight: {bird_data.get('weight', 'Unknown')} g
+- Days in care: {days_in_care}
+- Original injury: {bird_data.get('injury', 'Unknown')}
 
-📊 **Gesundheitstrend:**
-{health_history[:3] if health_history else "Keine Daten"}
+📊 **Health trend:**
+{health_history[:3] if health_history else 'No data'}
 
-🎯 **Bitte geben Sie an:**
-1. Auswilderungs-Wahrscheinlichkeit (Prozentsatz)
-2. Empfohlene Auswilderungszeitpunkt
-3. Noch erforderliche Trainings
-4. Potenzielle Risiken bei Auswilderung
+🎯 **Please provide:**
+1. Release probability (percentage)
+2. Recommended release timing
+3. Additional training required
+4. Potential release risks
 
-Antworte auf Englisch.
+Answer in English.
 """
 
         result = self._call_ollama(prompt)
-        return result or "Prognose konnte nicht generiert werden."
+        return result or "Prognosis could not be generated."
+
+    def generate_research_summary(
+        self,
+        bird_data: Dict,
+        health_history: list,
+        notes: Optional[str] = None
+    ) -> str:
+        """Generate a structured research summary for a bird case."""
+        health_items = "\n".join([
+            f"- {record.get('date', 'unknown')}: Weight {record.get('weight', '?')}g, Behavior: {record.get('behavior', 'unknown')}"
+            for record in (health_history or [])[-7:]
+        ]) or "No health data available."
+
+        research_goal = notes or "Create a concise research report with hypotheses and recommendations."
+
+        prompt = f"""
+You are a scientific expert in raptor rehabilitation.
+Create a structured research summary for the following case, including possible research questions:
+
+🦅 Bird data:
+- Species: {bird_data.get('species', 'Unknown')}
+- Weight: {bird_data.get('weight', 'Unknown')} g
+- Status: {bird_data.get('status', 'Unknown')}
+- Days in care: {bird_data.get('days_in_care', 'Unknown')}
+- Injury: {bird_data.get('injury', 'Unknown')}
+
+📊 Health history (last 7 entries):
+{health_items}
+
+📌 Research objective:
+{research_goal}
+
+Please provide:
+1. Brief case summary
+2. Relevant research questions
+3. Recommended observation and measurement parameters
+4. Research-relevant conclusions
+"""
+
+        result = self._call_ollama(prompt)
+        return result or "Research summary could not be generated."
+
+    def generate_research_hypotheses(
+        self,
+        bird_data: Dict,
+        health_history: list
+    ) -> str:
+        """Generate hypotheses and insight directions for research."""
+        health_trend = "\n".join([
+            f"- {record.get('date', 'unknown')}: Weight {record.get('weight', '?')}g, Condition: {record.get('behavior', 'unknown')}"
+            for record in (health_history or [])[-7:]
+        ]) or "No health data available."
+
+        prompt = f"""
+You are a research assistant for species and rehabilitation research specializing in raptors.
+Based on the following information, formulate at least three testable hypotheses:
+
+🦅 Bird profile:
+- Species: {bird_data.get('species', 'Unknown')}
+- Weight: {bird_data.get('weight', 'Unknown')} g
+- Status: {bird_data.get('status', 'Unknown')}
+- Days in care: {bird_data.get('days_in_care', 'Unknown')}
+
+📈 Health and progress data:
+{health_trend}
+
+Please reply with clear, quantitatively or qualitatively testable hypotheses.
+"""
+
+        result = self._call_ollama(prompt)
+        return result or "Research hypotheses could not be generated."
+
+    def summarize_literature(self, text: str) -> str:
+        """Summarize scientific or clinical text for research use."""
+        prompt = f"""
+You are a scientific editor for raptor and wildlife research.
+Summarize the following text into a concise summary featuring key findings and possible research questions:
+
+{text}
+
+Answer in a structured way and do not cite sources, but clearly state the main points.
+"""
+        result = self._call_ollama(prompt)
+        return result or "Literature summary could not be created."
+
+    def analyze_research_trends(self, records: list) -> str:
+        """Analyze trend data for potential research signals."""
+        summary = "\n".join([
+            f"- {item.get('date', 'unknown')}: {item.get('metric', 'N/A')}={item.get('value', 'N/A')}"
+            for item in (records or [])[-10:]
+        ]) or "No trend data available."
+
+        prompt = f"""
+You are an analytical scientist focused on rehabilitation data.
+Analyze these trend data and identify key patterns, deviations, or research questions:
+
+{summary}
+
+Please provide a brief interpretation, possible causes, and suggestions for further research.
+"""
+        result = self._call_ollama(prompt)
+        return result or "Trend analysis could not be completed."
 
 
 class NeuralNetworkProcessor:
@@ -181,7 +283,7 @@ class NeuralNetworkProcessor:
             "status": "success",
             "gpu_used": self.gpu_id,
             "analysis": {
-                "species_detected": "Wanderfalke",
+                "species_detected": "Peregrine Falcon",
                 "health_indicators": "Good plumage condition",
                 "injury_detection": "No visible injuries"
             }
@@ -207,10 +309,10 @@ if __name__ == "__main__":
     ai = RaptorCareAI()
 
     bird_data = {
-        "species": "Wanderfalke",
+        "species": "Peregrine Falcon",
         "weight": 900,
-        "behavior": "Alert, frisst gut",
-        "hydration_status": "Gut",
+        "behavior": "Alert, eating well",
+        "hydration_status": "Good",
         "days_in_care": 5
     }
 
