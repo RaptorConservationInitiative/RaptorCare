@@ -1,15 +1,50 @@
 #!/bin/bash
+# Station installation script (Client-side)
+
 set -e
 
-apt update
-apt install -y python3 python3-pip git
+echo "🦅 RaptorCare Station Client Installer"
+echo "======================================="
 
-pip3 install fastapi uvicorn requests
+# Update system
+echo "📦 Updating system packages..."
+apt-get update
+apt-get upgrade -y
 
-mkdir -p /opt/raptorcare_station
+# Install system dependencies
+echo "📦 Installing system dependencies..."
+apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    sqlite3 \
+    node.js \
+    npm \
+    git \
+    curl
 
-cp -r . /opt/raptorcare_station
+# Create venv
+echo "🐍 Creating Python virtual environment..."
+python3 -m venv /opt/raptorcare-station/venv
+source /opt/raptorcare-station/venv/bin/activate
 
-cd /opt/raptorcare_station/station
+# Install Python dependencies
+echo "📦 Installing Python packages..."
+pip install --upgrade pip setuptools wheel
+pip install -r /opt/raptorcare-station/requirements.txt
 
-nohup uvicorn app:app --host 0.0.0.0 --port 8001 &
+# Setup frontend
+echo "📱 Setting up React frontend..."
+cd /opt/raptorcare-station/frontend
+npm install
+npm run build
+
+echo "✅ Station installation complete!"
+echo ""
+echo "Next steps:"
+echo "1. Configure station connection:"
+echo "   export REACT_APP_API_URL=http://server-ip:8000"
+echo ""
+echo "2. Start the application:"
+echo "   cd /opt/raptorcare-station"
+echo "   npm start"
