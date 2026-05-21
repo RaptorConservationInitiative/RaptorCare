@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^python3 -m py_compile server/models\\.py server/main\\.py server/schemas\\.py server/sync\\.py station/client\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

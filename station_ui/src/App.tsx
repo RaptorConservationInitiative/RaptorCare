@@ -78,12 +78,14 @@ function App() {
       action: 'create',
       entity_type: 'bird',
       data: {
+        animal_class: birdAnimalClass,
         internal_id: birdInternalId,
         species: birdSpecies,
       },
     })
 
     setBirdInternalId('')
+    setBirdAnimalClass('bird')
     setStatusMessage('Bird saved locally and queued for sync.')
   }
 
@@ -241,6 +243,15 @@ function App() {
             <label>
               Internal ID
               <input value={birdInternalId} onChange={(e) => setBirdInternalId(e.target.value)} />
+            </label>
+            <label>
+              Animal class
+              <select value={birdAnimalClass} onChange={(e) => setBirdAnimalClass(e.target.value)}>
+                <option value="bird">Bird</option>
+                <option value="reptile">Reptile</option>
+                <option value="mammal">Mammal</option>
+                <option value="other">Other</option>
+              </select>
             </label>
             <label>
               Species

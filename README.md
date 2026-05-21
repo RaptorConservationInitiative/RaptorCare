@@ -119,36 +119,72 @@ Station Clients (Offline-First) Central Server ┌──────────
 git clone https://github.com/RaptorConservationInitiative/RaptorCare.git
 cd RaptorCare
 
-# 2. Create venv
+# 2. Run automatic installer
+sudo bash scripts/install_server.sh
+```
+
+- Dieses Skript installiert Python, PostgreSQL, erstellt die virtuelle Umgebung, legt `.env` an, erstellt die Datenbank und initialisiert das Schema.
+- Optional kann Ollama installiert werden, wenn es noch nicht vorhanden ist.
+
+### Manuelle Alternative
+
+```bash
 python3 -m venv venv
 source venv/bin/activate
-
-# 3. Install dependencies
 pip install -r requirements.txt
-
-# 4. Configure environment
 cp .env.example .env
-nano .env  # Edit database URL, secret key, etc.
-
-# 5. Initialize database
 bash scripts/init_db.sh
-
-# 6. Start server
 uvicorn server.main:app --reload
+```
 
-### LLM Setup (Optional but Recommended)
+### Station Service Setup (Remote Station)
 
-# Install Ollama
-bash scripts/setup_ollama.sh
+Die Station läuft auf einer separaten Maschine und kann unabhängig vom zentralen Server installiert werden.
 
-# Start Ollama service
-ollama serve
+```bash
+# Auf der Station-Maschine
+git clone https://github.com/RaptorConservationInitiative/RaptorCare.git
+cd RaptorCare
+sudo bash scripts/install_station.sh
+```
 
-### Station Client Setup
+- Dieses Skript installiert Python, legt eine virtuelle Umgebung an, installiert Abhängigkeiten und richtet den Service `raptorcare-station.service` ein.
+- Der Station-Service läuft standardmäßig auf `http://0.0.0.0:8001`.
 
-cd station
+### UI Setup
+
+#### Station UI
+```bash
+cd station_ui
 npm install
 npm run dev
+```
+
+#### Server UI
+```bash
+cd server_ui
+npm install
+npm run dev
+```
+
+### Testen
+- Python-Syntaxprüfung:
+  `python3 -m py_compile server/main.py station/app.py`
+- Prüfe den Server im Browser:
+  `http://localhost:8000/`
+- Prüfe den Station-Service im Browser:
+  `http://localhost:8001/`
+
+### Status der aktuellen Implementierung
+- `server/main.py` ist lauffähig und startet mit `uvicorn server.main:app`.
+- `station/app.py` ist lauffähig und startet mit `uvicorn station.app:app`.
+- Die zentrale Datenbank benötigt PostgreSQL; Standardkonfiguration ist in `server/config.py` und `.env.example` definiert.
+- Die UIs sind als Vite-Apps vorhanden und können mit `npm install` sowie `npm run dev` gestartet werden.
+
+### Wichtige Hinweise
+- Der Server ist syntaktisch validiert.
+- Für volle Funktionalität sind Datenbank und optional Ollama notwendig.
+- Einige Endpunkte und UI-Workflows sind noch in aktiver Entwicklung.
 
 📚 API Endpoints
 Authentication
