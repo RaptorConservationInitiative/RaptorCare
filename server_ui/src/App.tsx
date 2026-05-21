@@ -22,6 +22,10 @@ type StationInfo = {
     failed: number
     queue_utilization_percent: number
   }
+  gps_lat?: number
+  gps_lon?: number
+  contact_email?: string
+  contact_phone?: string
 }
 
 type BirdInfo = {
@@ -60,9 +64,11 @@ function App() {
   const [birds, setBirds] = useState<BirdInfo[]>([])
   const [events, setEvents] = useState<CalendarEventInfo[]>([])
   const [gpuStatus, setGpuStatus] = useState<GPUInfo[] | null>(null)
+  const [overviewReport, setOverviewReport] = useState<Record<string, any> | null>(null)
   const [researchResponse, setResearchResponse] = useState<string>('')
   const [researchGoal, setResearchGoal] = useState('Summarize this case and provide research questions.')
   const [researchNotes, setResearchNotes] = useState('')
+  const [language, setLanguage] = useState('en')
   const [statusMessage, setStatusMessage] = useState('Ready')
 
   const headers = token
@@ -118,6 +124,29 @@ function App() {
       }
     } catch (error: any) {
       setStatusMessage(`Failed to load stations: ${error.message}`)
+    }
+  }
+
+  const fetchOverviewReport = async () => {
+    if (!token) {
+      setStatusMessage('Please provide a bearer token to load overview data.')
+      return
+    }
+
+    try {
+      const response = await fetch(`${serverUrl}/reports/overview`, {
+        headers,
+      })
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`${response.status} ${text}`)
+      }
+      const data = await response.json()
+      setOverviewReport(data)
+      setStatusMessage('Overview report loaded.')
+    } catch (error: any) {
+      setOverviewReport(null)
+      setStatusMessage(`Failed to load overview report: ${error.message}`)
     }
   }
 
@@ -244,7 +273,44 @@ function App() {
             Bearer Token
             <input value={token} onChange={(e) => setToken(e.target.value)} type="password" />
           </label>
+          <label>
+            UI Language
+            <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+            </select>
+          </label>
         </div>
+      </section>
+
+      <section>
+        <h2>Overview Report</h2>
+        <div className="grid">
+          <button className="primary" onClick={fetchOverviewReport}>Load overview report</button>
+        </div>
+        {overviewReport ? (
+          <div className="queue-list">
+            <div className="queue-item">
+              <strong>Total birds</strong>: {overviewReport.total_birds}
+            </div>
+            <div className="queue-item">
+              <strong>Total stations</strong>: {overviewReport.total_stations}
+            </div>
+            <div className="queue-item">
+              <strong>Total schedule events</strong>: {overviewReport.total_calendar_events}
+            </div>
+            <div className="queue-item">
+              <strong>Total media files</strong>: {overviewReport.total_media_files}
+            </div>
+            <div className="queue-item">
+              <strong>Animal class counts</strong>: {JSON.stringify(overviewReport.animal_class_counts)}
+            </div>
+          </div>
+        ) : (
+          <p>No overview loaded yet.</p>
+        )}
       </section>
 
       <section>
@@ -266,9 +332,21 @@ function App() {
           <button className="primary" onClick={() => fetchCalendarEvents(selectedStation)}>Load schedule</button>
         </div>
         <pre>{stationData}</pre>
+        {stations.find((item) => item.station_id === selectedStation)?.gps_lat !== undefined ? (
+          <div className="map-card">
+            <h3>Selected station location</h3>
+            <iframe
+              title="Station map"
+              width="100%"
+              height="350"
+              src={`https://www.openstreetmap.org/export/embed.html?bbox=${(stations.find((item) => item.station_id === selectedStation)?.gps_lon ?? 0) - 0.01}%2C${(stations.find((item) => item.station_id === selectedStation)?.gps_lat ?? 0) - 0.01}%2C${(stations.find((item) => item.station_id === selectedStation)?.gps_lon ?? 0) + 0.01}%2C${(stations.find((item) => item.station_id === selectedStation)?.gps_lat ?? 0) + 0.01}&layer=mapnik&marker=${stations.find((item) => item.station_id === selectedStation)?.gps_lat ?? 0}%2C${stations.find((item) => item.station_id === selectedStation)?.gps_lon ?? 0}`}
+            />
+          </div>
+        ) : (
+          <p>No location data available for the selected station.</p>
+        )}
         <div className="queue-list">
           {stations.map((station) => (
-            <div key={station.station_id} className="queue-item">
               <strong>{station.name}</strong>
               <p>ID: {station.station_id}</p>
               <p>Pending: {station.sync_stats.pending}</p>

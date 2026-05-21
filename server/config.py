@@ -31,10 +31,9 @@ class Settings(BaseSettings):
     SYNC_INTERVAL_SECONDS: int = 300
     MAX_OFFLINE_QUEUE_SIZE: int = 10000
     
-    # Station Configuration
-    STATION_ID: str = "station_001"
-    STATION_NAME: str = "Main Rescue Center"
-    
+    # File upload
+    UPLOAD_DIR: str = "uploads"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -20,6 +20,10 @@ type StationInfo = {
     failed: number
     queue_utilization_percent: number
   }
+  gps_lat?: number
+  gps_lon?: number
+  contact_email?: string
+  contact_phone?: string
 }
 
 const STORAGE_KEY = 'raptorcare_station_queue'
@@ -51,6 +55,17 @@ function App() {
   const [healthBirdId, setHealthBirdId] = useState(1)
   const [healthWeight, setHealthWeight] = useState(0)
   const [healthBehavior, setHealthBehavior] = useState('')
+  const [calendarTitle, setCalendarTitle] = useState('')
+  const [calendarDate, setCalendarDate] = useState('')
+  const [calendarTime, setCalendarTime] = useState('12:00')
+  const [calendarLocation, setCalendarLocation] = useState('')
+  const [calendarNotes, setCalendarNotes] = useState('')
+  const [qrCodeValue, setQrCodeValue] = useState('')
+  const [mediaFile, setMediaFile] = useState<File | null>(null)
+  const [mediaDescription, setMediaDescription] = useState('')
+  const [language, setLanguage] = useState('en')
+  const [stationLat, setStationLat] = useState<number | null>(null)
+  const [stationLon, setStationLon] = useState<number | null>(null)
   const [stations, setStations] = useState<StationInfo[]>([])
   const [stationDetails, setStationDetails] = useState('No station data loaded yet.')
 
@@ -86,6 +101,7 @@ function App() {
 
     setBirdInternalId('')
     setBirdAnimalClass('bird')
+    setQrCodeValue('')
     setStatusMessage('Bird saved locally and queued for sync.')
   }
 
@@ -104,6 +120,42 @@ function App() {
 
     setHealthBehavior('')
     setStatusMessage('Health record stored locally.')
+  }
+
+  const uploadMedia = async () => {
+    if (!mediaFile) {
+      setStatusMessage('Please select a media file before uploading.')
+      return
+    }
+    if (!token) {
+      setStatusMessage('Please provide a bearer token to upload media.')
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('file', mediaFile)
+    formData.append('description', mediaDescription)
+
+    try {
+      const response = await fetch(`${serverUrl}/birds/${healthBirdId}/media`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`${response.status} ${text}`)
+      }
+
+      setMediaFile(null)
+      setMediaDescription('')
+      setStatusMessage('Media file uploaded successfully.')
+    } catch (error: any) {
+      setStatusMessage(`Media upload failed: ${error.message}`)
+    }
   }
 
   const createCalendarEvent = () => {
@@ -207,6 +259,14 @@ function App() {
     setStationDetails(
       `Station ${station.station_id} (${station.name})\nLocation: ${station.location}\nPending: ${station.sync_stats.pending}\nCompleted: ${station.sync_stats.completed}\nFailed: ${station.sync_stats.failed}\nQueue utilization: ${station.sync_stats.queue_utilization_percent.toFixed(1)}%`
     )
+
+    if (station.gps_lat && station.gps_lon) {
+      setStationLat(station.gps_lat)
+      setStationLon(station.gps_lon)
+    } else {
+      setStationLat(null)
+      setStationLon(null)
+    }
   }
 
   return (
@@ -230,6 +290,15 @@ function App() {
           <label>
             Bearer Token
             <input value={token} onChange={(e) => setToken(e.target.value)} type="password" />
+          </label>
+          <label>
+            UI Language
+            <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+            </select>
           </label>
           <button className="primary" onClick={loadStations}>Load stations from server</button>
         </div>
@@ -283,6 +352,30 @@ function App() {
               <input value={healthBehavior} onChange={(e) => setHealthBehavior(e.target.value)} />
             </label>
             <button onClick={recordHealth}>Store health check</button>
+          </div>
+
+          <div className="card">
+            <h3>Upload Media</h3>
+            <label>
+              Bird ID
+              <input
+                type="number"
+                value={healthBirdId}
+                onChange={(e) => setHealthBirdId(Number(e.target.value))}
+              />
+            </label>
+            <label>
+              File
+              <input
+                type="file"
+                onChange={(e) => setMediaFile(e.target.files ? e.target.files[0] : null)}
+              />
+            </label>
+            <label>
+              Description
+              <input value={mediaDescription} onChange={(e) => setMediaDescription(e.target.value)} />
+            </label>
+            <button onClick={uploadMedia}>Upload media to server</button>
           </div>
 
           <div className="card">
@@ -346,6 +439,22 @@ function App() {
           ))}
         </div>
         <pre>{stationDetails}</pre>
+        {stationLat !== null && stationLon !== null ? (
+          <div className="map-card">
+            <h3>Station Location</h3>
+            <iframe
+              title="Station map"
+              width="100%"
+              height="350"
+              src={`https://www.openstreetmap.org/export/embed.html?bbox=${stationLon - 0.01}%2C${stationLat - 0.01}%2C${stationLon + 0.01}%2C${stationLat + 0.01}&layer=mapnik&marker=${stationLat}%2C${stationLon}`}
+            />
+            <p>
+              Coordinates: {stationLat.toFixed(5)}, {stationLon.toFixed(5)}
+            </p>
+          </div>
+        ) : (
+          <p>No GPS data available for the selected station.</p>
+        )}
       </section>
     </div>
   )

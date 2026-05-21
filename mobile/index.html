@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RaptorCare Mobile</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#2a4d69" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 1rem; background: #f4f6f8; }
+    header { background: #2a4d69; color: white; padding: 1rem; border-radius: 8px; }
+    button { background: #4b86b4; border: none; color: white; padding: 0.8rem 1rem; border-radius: 6px; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .card { background: white; border-radius: 10px; padding: 1rem; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    input, textarea { width: 100%; padding: 0.75rem; margin: 0.4rem 0 1rem; border: 1px solid #ccc; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>RaptorCare Mobile</h1>
+    <p>Offline-friendly field client for rescue station data.</p>
+  </header>
+
+  <section class="card">
+    <h2>Quick Status</h2>
+    <button id="refreshStatus">Refresh status</button>
+    <pre id="statusOutput">Not connected yet.</pre>
+  </section>
+
+  <section class="card">
+    <h2>Sync Station</h2>
+    <label>Server URL<input id="serverUrl" type="url" value="http://localhost:8000" /></label>
+    <label>Bearer Token<input id="token" type="password" /></label>
+    <button id="syncButton">Sync queued actions</button>
+  </section>
+
+  <section class="card">
+    <h2>Scan / Tag</h2>
+    <p>This mobile client includes a placeholder for QR/RFID scanning in the future.</p>
+    <button id="scanButton">Open scanner placeholder</button>
+    <pre id="scanOutput">Scanner not yet implemented.</pre>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -3,12 +3,15 @@ RaptorCare Server
 FastAPI backend for wildlife rescue station management
 """
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from contextlib import asynccontextmanager
 import logging
+import shutil
+import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional, List
 
 from server.config import get_settings
@@ -17,7 +20,7 @@ from server.database import init_db, get_db
 from server.gpu import GPUPool
 from server.llm import RaptorCareAI
 from server.sync import SyncManager
-from server.models import User, Bird, HealthRecord, Station, FeedingLog, CalendarEvent, BirdStatus
+from server.models import User, Bird, HealthRecord, Station, FeedingLog, CalendarEvent, Media, BirdStatus
 from server.schemas import (
     TokenResponse,
     BirdSchema,
@@ -26,6 +29,7 @@ from server.schemas import (
     HealthRecordSchema,
     FeedingLogCreate,
     FeedingLogSchema,
+    MediaSchema,
     CalendarEventCreate,
     CalendarEventSchema,
     ResearchPrompt,
@@ -46,7 +50,8 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("🦅 RaptorCare Server starting...")
     init_db()
-    logger.info("✅ Database initialized")
+    Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+    logger.info(f"✅ Database initialized and upload directory ensured at {settings.UPLOAD_DIR}")
     yield
     # Shutdown
     logger.info("🔌 RaptorCare Server shutting down...")
@@ -321,12 +326,103 @@ async def list_stations(
             "station_id": station.station_id,
             "name": station.name,
             "location": station.location,
+            "gps_lat": station.gps_lat,
+            "gps_lon": station.gps_lon,
+            "contact_email": station.contact_email,
+            "contact_phone": station.contact_phone,
             "created_at": station.created_at.isoformat(),
             "updated_at": station.updated_at.isoformat(),
             "sync_stats": stats,
         })
 
     return {"stations": station_list}
+
+# ============================================================================
+# REPORTS & FILE UPLOAD
+# ============================================================================
+
+@app.get("/reports/overview", tags=["Reports"])
+async def get_overview_report(
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Return high-level counts for dashboard reporting."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    total_birds = db.query(Bird).count()
+    total_stations = db.query(Station).count()
+    total_events = db.query(CalendarEvent).count()
+    total_media = db.query(Media).count()
+
+    animal_counts = {
+        "bird": db.query(Bird).filter(Bird.animal_class == "bird").count(),
+        "reptile": db.query(Bird).filter(Bird.animal_class == "reptile").count(),
+        "mammal": db.query(Bird).filter(Bird.animal_class == "mammal").count(),
+        "other": db.query(Bird).filter(Bird.animal_class == "other").count(),
+    }
+
+    return {
+        "total_birds": total_birds,
+        "total_stations": total_stations,
+        "total_calendar_events": total_events,
+        "total_media_files": total_media,
+        "animal_class_counts": animal_counts,
+    }
+
+@app.post("/birds/{bird_id}/media", response_model=MediaSchema, tags=["Media"])
+async def upload_bird_media(
+    bird_id: int,
+    file: UploadFile = File(...),
+    description: Optional[str] = Form(None),
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Upload a media file for a patient record."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    bird = db.query(Bird).filter(Bird.id == bird_id).first()
+    if not bird:
+        raise HTTPException(status_code=404, detail="Bird not found")
+
+    upload_path = Path(settings.UPLOAD_DIR)
+    upload_path.mkdir(parents=True, exist_ok=True)
+    timestamp = int(time.time())
+    dest_name = f"bird_{bird_id}_{timestamp}_{file.filename.replace(' ', '_')}"
+    dest_file = upload_path / dest_name
+
+    with dest_file.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    media = Media(
+        bird_id=bird_id,
+        file_path=str(dest_file),
+        file_name=file.filename,
+        file_type=file.content_type,
+        file_size_bytes=dest_file.stat().st_size,
+        description=description,
+    )
+    db.add(media)
+    db.commit()
+    db.refresh(media)
+    return media
+
+@app.get("/birds/{bird_id}/media", response_model=List[MediaSchema], tags=["Media"])
+async def list_bird_media(
+    bird_id: int,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """List uploaded media files for a patient."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    medias = db.query(Media).filter(Media.bird_id == bird_id).all()
+    return medias
 
 # ============================================================================
 # CALENDAR ENDPOINTS

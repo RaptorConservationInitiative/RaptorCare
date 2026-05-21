@@ -148,24 +148,34 @@ cd RaptorCare
 sudo bash scripts/install_station.sh
 ```
 
-- Dieses Skript installiert Python, legt eine virtuelle Umgebung an, installiert Abhängigkeiten und richtet den Service `raptorcare-station.service` ein.
+- Dieses Skript installiert Python, legt eine virtuelle Umgebung an, installiert Abhängigkeiten, richtet den Service `raptorcare-station.service` ein und startet ihn automatisch.
 - Der Station-Service läuft standardmäßig auf `http://0.0.0.0:8001`.
 
 ### UI Setup
 
-#### Station UI
+Die UIs werden jetzt automatisch während der Installationsskripte installiert und gebaut.
+
+- `scripts/install_server.sh` installiert Node.js/NPM und baut `server_ui` und `station_ui`.
+- `scripts/install_station.sh` installiert Node.js/NPM, baut `station_ui` und richtet den Station-Service ein.
+
+#### Manuelle UI-Option
 ```bash
 cd station_ui
 npm install
 npm run dev
 ```
 
-#### Server UI
 ```bash
 cd server_ui
 npm install
 npm run dev
 ```
+
+### Mobile PWA
+
+- `mobile/` enthält eine einfache PWA-Shell für mobilen Feldzugriff.
+- Offline-Caching wird durch einen Service Worker unterstützt.
+- QR/RFID-Scanning ist als Placeholder integriert und kann später erweitert werden.
 
 ### Testen
 - Python-Syntaxprüfung:
@@ -174,16 +184,23 @@ npm run dev
   `http://localhost:8000/`
 - Prüfe den Station-Service im Browser:
   `http://localhost:8001/`
+- Prüfe den Mobil-Client (PWA):
+  `http://localhost:8000/mobile/index.html`
 
 ### Status der aktuellen Implementierung
-- `server/main.py` ist lauffähig und startet mit `uvicorn server.main:app`.
-- `station/app.py` ist lauffähig und startet mit `uvicorn station.app:app`.
-- Die zentrale Datenbank benötigt PostgreSQL; Standardkonfiguration ist in `server/config.py` und `.env.example` definiert.
-- Die UIs sind als Vite-Apps vorhanden und können mit `npm install` sowie `npm run dev` gestartet werden.
+- `server/main.py` ist lauffähig und startet als Systemd-Dienst `raptorcare.service`.
+- `station/app.py` ist lauffähig und startet als Systemd-Dienst `raptorcare-station.service`.
+- PostgreSQL wird automatisch installiert und initialisiert.
+- `server_ui` und `station_ui` werden automatisch installiert und gebaut.
+- `mobile/` liefert eine PWA-Grundstruktur für mobile Nutzung.
+- Medien-/Datei-Upload ist über `/birds/{bird_id}/media` verfügbar.
+- GIS/Kartenunterstützung für Stationen ist in den UIs sichtbar.
+- Reporting/Dashboard-Zusammenfassungen sind über `/reports/overview` verfügbar.
+- UI-Sprach-Auswahl und Mehrsprachigkeits-Scaffolding sind eingebaut.
 
 ### Wichtige Hinweise
 - Der Server ist syntaktisch validiert.
-- Für volle Funktionalität sind Datenbank und optional Ollama notwendig.
+- Für volle Funktionalität sind Datenbank und Ollama notwendig.
 - Einige Endpunkte und UI-Workflows sind noch in aktiver Entwicklung.
 
 📚 API Endpoints

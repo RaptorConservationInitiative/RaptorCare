@@ -232,6 +232,9 @@ class MediaSchema(BaseModel):
     description: Optional[str]
     uploaded_at: datetime
 
+    class Config:
+        orm_mode = True
+
 # ============================================================================
 # TIMELINE EVENT SCHEMAS
 # ============================================================================

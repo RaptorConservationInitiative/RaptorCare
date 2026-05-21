@@ -23,7 +23,7 @@ echo "========================================="
 
 echo_step "Updating system packages..."
 apt-get update
-apt-get install -y python3 python3-venv python3-dev git curl wget
+apt-get install -y python3 python3-venv python3-dev git curl wget nodejs npm
 
 echo_step "Preparing station repository..."
 if [[ -f "$REPO_ROOT/station/app.py" ]]; then
@@ -64,6 +64,15 @@ else
     echo "⚠️  requirements.txt not found in $STATION_DIR"
 fi
 
+echo_step "Installing station UI dependencies and building UI..."
+if [[ -d "$STATION_DIR/station_ui" ]]; then
+    cd "$STATION_DIR/station_ui"
+    npm install
+    npm run build
+    echo "✅ Built station UI"
+    cd "$STATION_DIR"
+fi
+
 echo_step "Installing station systemd service..."
 cat > "$STATION_SERVICE_FILE" <<EOF
 [Unit]
@@ -87,18 +96,15 @@ EOF
 
 chmod 644 "$STATION_SERVICE_FILE"
 systemctl daemon-reload
-systemctl enable raptorcare-station.service
+systemctl enable --now raptorcare-station.service
+chown -R raptorcare-station:raptorcare-station "$STATION_DIR"
 
 cat <<EOF
 
 ✅ Station installation complete!
 
-Usage:
-  systemctl start raptorcare-station.service
+The station service is running as a systemd service:
   systemctl status raptorcare-station.service
-
-If you want to start it immediately:
-  systemctl start raptorcare-station.service
 
 Station app path:
   $STATION_DIR/station/app.py
