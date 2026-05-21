@@ -158,18 +158,45 @@ Die UIs werden jetzt automatisch während der Installationsskripte installiert u
 - `scripts/install_server.sh` installiert Node.js/NPM und baut `server_ui` und `station_ui`.
 - `scripts/install_station.sh` installiert Node.js/NPM, baut `station_ui` und richtet den Station-Service ein.
 
-#### Manuelle UI-Option
-```bash
-cd station_ui
-npm install
-npm run dev
-```
+### UI-Aufruf
 
-```bash
-cd server_ui
-npm install
-npm run dev
-```
+#### Server-Dashboard
+- Entwicklermodus:
+  ```bash
+  cd server_ui
+  npm install
+  npm run dev -- --port 5173
+  ```
+- Öffne im Browser:
+  `http://localhost:5173`
+
+#### Station-UI
+- Entwicklermodus auf der Station oder lokal:
+  ```bash
+  cd station_ui
+  npm install
+  npm run dev -- --port 5174
+  ```
+- Öffne im Browser:
+  `http://localhost:5174`
+
+> Wenn Server-UI und Station-UI auf derselben Maschine laufen, verwende unterschiedliche Ports wie oben gezeigt.
+
+#### Produktions-Builds
+- Der Build erzeugt statische Dateien in `server_ui/dist` und `station_ui/dist`.
+- Diese können mit einem beliebigen statischen Webserver oder in eine eigene Hosting-Umgebung eingebunden werden.
+
+### Stationen und Mitarbeitende verwalten
+
+- Im Server-Dashboard kannst du jeder Station einen klaren, unverkennbaren Namen geben.
+- Die Stationen erhalten einen Namen, eine Adresse/Standortbeschreibung sowie Kontakt-Email und Telefonnummer.
+- Du kannst zusätzlich Mitarbeitende für jede Station verwalten: Name, Rolle, E-Mail und Telefon.
+- Änderungen erscheinen in der Stationenliste und werden dann auch in der Station-UI sichtbar, sobald die Station über den Server geladen wird.
+
+#### Server-UI Funktionen
+- Stationen laden über `/stations`
+- Station bearbeiten über `/stations/{station_id}`
+- Personal im Server-UI hinzufügen und bearbeiten
 
 ### Mobile PWA
 

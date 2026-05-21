@@ -100,6 +100,42 @@ class UserSchema(BaseModel):
     is_active: bool
     created_at: datetime
 
+    class Config:
+        orm_mode = True
+
+class StationStaffMember(BaseModel):
+    """A station staff member."""
+    name: str
+    role: str
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+
+class StationUpdate(BaseModel):
+    """Update station metadata and staff."""
+    name: Optional[str] = None
+    location: Optional[str] = None
+    gps_lat: Optional[float] = None
+    gps_lon: Optional[float] = None
+    contact_email: Optional[EmailStr] = None
+    contact_phone: Optional[str] = None
+    staff: Optional[List[StationStaffMember]] = None
+
+class StationSchema(BaseModel):
+    """Station response"""
+    station_id: str
+    name: str
+    location: Optional[str] = None
+    gps_lat: Optional[float] = None
+    gps_lon: Optional[float] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    staff: Optional[List[StationStaffMember]] = []
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
+
 # ============================================================================
 # BIRD (PATIENT) SCHEMAS
 # ============================================================================

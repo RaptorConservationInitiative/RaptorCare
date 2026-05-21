@@ -11,6 +11,13 @@ type GPUInfo = {
   utilization_percent: number
 }
 
+type StationStaffMember = {
+  name: string
+  role: string
+  email?: string
+  phone?: string
+}
+
 type StationInfo = {
   station_id: string
   name: string
@@ -28,6 +35,7 @@ type StationInfo = {
   gps_lon?: number
   contact_email?: string
   contact_phone?: string
+  staff?: StationStaffMember[]
 }
 
 type PatientInfo = {
@@ -74,6 +82,15 @@ function App() {
   const [researchNotes, setResearchNotes] = useState('')
   const [language, setLanguage] = useState('en')
   const [statusMessage, setStatusMessage] = useState('Ready')
+  const [stationName, setStationName] = useState('')
+  const [stationLocation, setStationLocation] = useState('')
+  const [stationEmail, setStationEmail] = useState('')
+  const [stationPhone, setStationPhone] = useState('')
+  const [stationStaff, setStationStaff] = useState<StationStaffMember[]>([])
+  const [newStaffName, setNewStaffName] = useState('')
+  const [newStaffRole, setNewStaffRole] = useState('')
+  const [newStaffEmail, setNewStaffEmail] = useState('')
+  const [newStaffPhone, setNewStaffPhone] = useState('')
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const leafletMapRef = useRef<L.Map | null>(null)
   const markerLayerRef = useRef<L.LayerGroup | null>(null)
@@ -166,6 +183,7 @@ function App() {
       setStatusMessage('Station overview loaded.')
       if (stationData.length) {
         setSelectedStation(stationData[0].station_id)
+        loadStationFormValues(stationData[0])
       }
       updateStationMap(stationData)
     } catch (error: any) {
@@ -307,6 +325,69 @@ function App() {
         `Queue failed: ${station.sync_stats.failed}\n` +
         `Utilization: ${station.sync_stats.queue_utilization_percent.toFixed(1)}%`
     )
+    loadStationFormValues(station)
+  }
+
+  const loadStationFormValues = (station: StationInfo) => {
+    setStationName(station.name)
+    setStationLocation(station.location || '')
+    setStationEmail(station.contact_email || '')
+    setStationPhone(station.contact_phone || '')
+    setStationStaff(station.staff || [])
+  }
+
+  const addStationStaffMember = () => {
+    if (!newStaffName || !newStaffRole) {
+      setStatusMessage('Please provide at least name and role for new staff.')
+      return
+    }
+    setStationStaff((current) => [
+      ...current,
+      {
+        name: newStaffName,
+        role: newStaffRole,
+        email: newStaffEmail || undefined,
+        phone: newStaffPhone || undefined,
+      },
+    ])
+    setNewStaffName('')
+    setNewStaffRole('')
+    setNewStaffEmail('')
+    setNewStaffPhone('')
+    setStatusMessage('Added new station staff member.')
+  }
+
+  const removeStationStaffMember = (index: number) => {
+    setStationStaff((current) => current.filter((_, idx) => idx !== index))
+  }
+
+  const updateStation = async () => {
+    if (!token) {
+      setStatusMessage('Please provide a bearer token to update the station.')
+      return
+    }
+    try {
+      const response = await fetch(`${serverUrl}/stations/${encodeURIComponent(selectedStation)}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          name: stationName,
+          location: stationLocation,
+          contact_email: stationEmail || undefined,
+          contact_phone: stationPhone || undefined,
+          staff: stationStaff,
+        }),
+      })
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`${response.status} ${text}`)
+      }
+      const updated = await response.json()
+      setStatusMessage(`Station ${updated.name} updated successfully.`)
+      fetchStations()
+    } catch (error: any) {
+      setStatusMessage(`Failed to update station: ${error.message}`)
+    }
   }
 
   const updateStationMap = (stationData: StationInfo[]) => {
@@ -396,7 +477,11 @@ function App() {
           <button className="primary" onClick={fetchStations}>Refresh stations list</button>
           <label>
             Select station
-            <select value={selectedStation} onChange={(e) => setSelectedStation(e.target.value)}>
+            <select value={selectedStation} onChange={(e) => {
+              setSelectedStation(e.target.value)
+              const station = stations.find((item) => item.station_id === e.target.value)
+              if (station) loadStationFormValues(station)
+            }}>
               {stations.map((station) => (
                 <option key={station.station_id} value={station.station_id}>
                   {station.station_id}
@@ -428,6 +513,60 @@ function App() {
               <p>Failed: {station.sync_stats.failed}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>Station Management</h2>
+        <div className="grid">
+          <label>
+            Station name
+            <input value={stationName} onChange={(e) => setStationName(e.target.value)} />
+          </label>
+          <label>
+            Location
+            <input value={stationLocation} onChange={(e) => setStationLocation(e.target.value)} />
+          </label>
+          <label>
+            Contact email
+            <input value={stationEmail} onChange={(e) => setStationEmail(e.target.value)} />
+          </label>
+          <label>
+            Contact phone
+            <input value={stationPhone} onChange={(e) => setStationPhone(e.target.value)} />
+          </label>
+          <button className="primary" onClick={updateStation}>Save station metadata</button>
+        </div>
+        <div className="card">
+          <h3>Station staff</h3>
+          {stationStaff.map((member, index) => (
+            <div key={`${member.name}-${index}`} className="queue-item">
+              <strong>{member.name}</strong> — {member.role}
+              <p>Email: {member.email || 'n/a'}</p>
+              <p>Phone: {member.phone || 'n/a'}</p>
+              <button type="button" onClick={() => removeStationStaffMember(index)}>Remove</button>
+            </div>
+          ))}
+          <div className="card">
+            <h4>Add staff member</h4>
+            <label>
+              Name
+              <input value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} />
+            </label>
+            <label>
+              Role
+              <input value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} />
+            </label>
+            <label>
+              Email
+              <input value={newStaffEmail} onChange={(e) => setNewStaffEmail(e.target.value)} />
+            </label>
+            <label>
+              Phone
+              <input value={newStaffPhone} onChange={(e) => setNewStaffPhone(e.target.value)} />
+            </label>
+            <button type="button" className="primary" onClick={addStationStaffMember}>Add staff</button>
+          </div>
         </div>
       </section>
 

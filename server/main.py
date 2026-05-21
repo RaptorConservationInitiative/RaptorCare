@@ -7,6 +7,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from contextlib import asynccontextmanager
+import json
 import logging
 import shutil
 import time
@@ -37,6 +38,8 @@ from server.schemas import (
     ResearchPrompt,
     ResearchOutput,
     GPUStatusResponse,
+    StationSchema,
+    StationUpdate,
 )
 
 # Configure logging
@@ -431,12 +434,66 @@ async def list_stations(
             "gps_lon": station.gps_lon,
             "contact_email": station.contact_email,
             "contact_phone": station.contact_phone,
+            "staff": station.staff or [],
             "created_at": station.created_at.isoformat(),
             "updated_at": station.updated_at.isoformat(),
             "sync_stats": stats,
         })
 
     return {"stations": station_list}
+
+@app.get("/stations/{station_id}", response_model=StationSchema, tags=["Stations"])
+async def get_station(
+    station_id: str,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Get station metadata and staff details."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    station = db.query(Station).filter(Station.station_id == station_id).first()
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+
+    return station
+
+@app.patch("/stations/{station_id}", response_model=StationSchema, tags=["Stations"])
+async def update_station(
+    station_id: str,
+    station_update: StationUpdate,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Update station metadata, name, contact details, and staff."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    station = db.query(Station).filter(Station.station_id == station_id).first()
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+
+    if station_update.name is not None:
+        station.name = station_update.name
+    if station_update.location is not None:
+        station.location = station_update.location
+    if station_update.gps_lat is not None:
+        station.gps_lat = station_update.gps_lat
+    if station_update.gps_lon is not None:
+        station.gps_lon = station_update.gps_lon
+    if station_update.contact_email is not None:
+        station.contact_email = station_update.contact_email
+    if station_update.contact_phone is not None:
+        station.contact_phone = station_update.contact_phone
+    if station_update.staff is not None:
+        station.staff = [member.dict() for member in station_update.staff]
+
+    station.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(station)
+    return station
 
 # ============================================================================
 # REPORTS & FILE UPLOAD

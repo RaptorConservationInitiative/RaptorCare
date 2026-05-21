@@ -3,7 +3,7 @@ SQLAlchemy ORM models for RaptorCare
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey, Enum, JSON
 from sqlalchemy.orm import relationship
 import enum
 
@@ -308,6 +308,7 @@ class Station(Base):
     gps_lon = Column(Float, nullable=True)
     contact_email = Column(String(255))
     contact_phone = Column(String(20))
+    staff = Column(JSON, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
