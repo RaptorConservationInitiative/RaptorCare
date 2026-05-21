@@ -248,24 +248,23 @@ Sync
 🐛 Known Issues & TODOs
 High Priority
 
-    Fix JWT token verification (currently missing token error)
-    Implement actual bird CRUD operations
-    Add health record creation/retrieval
-    Complete sync endpoint implementation
+    Validate production authentication flow and token handling
+    Harden sync error handling and conflict resolution
+    Add more UI workflows and input validation
 
 Medium Priority
 
-    Frontend React app
-    Media/file upload handling
-    GIS/map integration
-    Statistical reporting
+    Frontend React UI built and auto-installed by setup scripts
+    Media/file upload handling implemented through /birds/{bird_id}/media
+    GIS/map integration shown in station and server dashboards
+    Statistical reporting available via /reports/overview
 
 Low Priority
 
-    Mobile app (native iOS/Android)
-    RFID/QR code scanning
-    Advanced LLM fine-tuning
-    Multi-language support
+    Mobile PWA shell added under mobile/
+    RFID/QR code scanning available as a placeholder for future extension
+    Advanced LLM fine-tuning scaffolding present in server/llm.py
+    Multi-language UI scaffolding present in React apps
 
     📖 Database Schema
 
