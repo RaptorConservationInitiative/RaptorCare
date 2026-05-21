@@ -28,6 +28,26 @@ class RaptorCareAI:
         GPUPool.set_device(self.gpu_id)
         logger.info(f"🤖 RaptorCareAI initialized on GPU {self.gpu_id}")
 
+    def _animal_context(self, animal_class: str) -> str:
+        animal_class = (animal_class or "bird").lower()
+        if animal_class == "reptile":
+            return "You are an expert in reptile rehabilitation, paying attention to temperature, humidity, and molting cycles."
+        if animal_class == "mammal":
+            return "You are an expert in mammal rehabilitation, focusing on body condition, fur/pelage health, and behavioral enrichment."
+        if animal_class == "other":
+            return "You are an expert in wildlife rehabilitation for a general patient, considering species-specific needs."
+        return "You are an expert in bird rehabilitation, focusing on flight conditioning, plumage, and raptor-specific dietary needs."
+
+    def _animal_title(self, animal_class: str) -> str:
+        animal_class = (animal_class or "bird").lower()
+        if animal_class == "reptile":
+            return "🦎 Reptile"
+        if animal_class == "mammal":
+            return "🦌 Mammal"
+        if animal_class == "other":
+            return "🐾 Wildlife patient"
+        return "🦅 Bird"
+
     def _call_ollama(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
         """Call Ollama API with prompt"""
         try:
@@ -50,12 +70,12 @@ class RaptorCareAI:
 
     def generate_care_recommendations(self, bird_data: Dict) -> str:
         """Generate daily care recommendations."""
-
+        animal_class = bird_data.get("animal_class", "bird")
         prompt = f"""
-You are an expert in raptor rehabilitation at a wildlife rescue station.
-Based on the following bird data, provide detailed care recommendations in English:
+{self._animal_context(animal_class)}
+Based on the following patient data, provide detailed care recommendations in English:
 
-🦅 **Bird data:**
+{self._animal_title(animal_class)} **Patient data:**
 - Species: {bird_data.get('species', 'Unknown')}
 - Weight: {bird_data.get('weight', 'Unknown')} g
 - Behavior: {bird_data.get('behavior', 'Unknown')}
@@ -64,9 +84,9 @@ Based on the following bird data, provide detailed care recommendations in Engli
 
 📋 **Provide specific guidance for:**
 1. Diet and meal size
-2. Activity support
+2. Activity or enclosure support
 3. Medical monitoring
-4. Enclosure requirements
+4. Habitat requirements
 5. Release readiness indicators
 
 Answer clearly and concisely in English.
@@ -77,21 +97,22 @@ Answer clearly and concisely in English.
 
     def generate_feeding_plan(self, bird_data: Dict) -> str:
         """Generate a feeding plan."""
+        animal_class = bird_data.get("animal_class", "bird")
 
         prompt = f"""
-You are a specialist in raptor nutrition.
-Create a detailed feeding plan for the following bird:
+{self._animal_context(animal_class)}
+Create a detailed feeding plan for the following patient:
 
-🦅 Species: {bird_data.get('species', 'Unknown')}
+{self._animal_title(animal_class)} Species: {bird_data.get('species', 'Unknown')}
 📊 Weight: {bird_data.get('weight', 'Unknown')} g
 🎯 Rehabilitation status: {bird_data.get('status', 'Unknown')}
 
 Please include:
-1. Recommended prey type (whole/chopped)
+1. Recommended diet or prey type
 2. Daily food amount
 3. Feeding frequency
-4. Feeding method (independent/assisted)
-5. Nutrition goals for this week
+4. Feeding method or assistance required
+5. Nutrition goals for the next week
 
 Answer in English.
 """
@@ -173,10 +194,10 @@ Answer in English.
         research_goal = notes or "Create a concise research report with hypotheses and recommendations."
 
         prompt = f"""
-You are a scientific expert in raptor rehabilitation.
+You are a scientific expert in wildlife rehabilitation and research.
 Create a structured research summary for the following case, including possible research questions:
 
-🦅 Bird data:
+{self._animal_title(bird_data.get('animal_class', 'bird'))} Patient data:
 - Species: {bird_data.get('species', 'Unknown')}
 - Weight: {bird_data.get('weight', 'Unknown')} g
 - Status: {bird_data.get('status', 'Unknown')}
@@ -211,10 +232,10 @@ Please provide:
         ]) or "No health data available."
 
         prompt = f"""
-You are a research assistant for species and rehabilitation research specializing in raptors.
+You are a research assistant for wildlife rehabilitation research.
 Based on the following information, formulate at least three testable hypotheses:
 
-🦅 Bird profile:
+{self._animal_title(bird_data.get('animal_class', 'bird'))} profile:
 - Species: {bird_data.get('species', 'Unknown')}
 - Weight: {bird_data.get('weight', 'Unknown')} g
 - Status: {bird_data.get('status', 'Unknown')}

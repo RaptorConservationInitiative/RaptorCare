@@ -142,6 +142,18 @@ class BirdSchema(BirdCreate):
     class Config:
         orm_mode = True
 
+class PatientCreate(BirdCreate):
+    """Patient creation request."""
+    pass
+
+class PatientUpdate(BirdUpdate):
+    """Patient update request."""
+    pass
+
+class PatientSchema(BirdSchema):
+    """Patient response."""
+    pass
+
 # ============================================================================
 # HEALTH RECORD SCHEMAS
 # ============================================================================

@@ -20,11 +20,13 @@ from server.database import init_db, get_db
 from server.gpu import GPUPool
 from server.llm import RaptorCareAI
 from server.sync import SyncManager
-from server.models import User, Bird, HealthRecord, Station, FeedingLog, CalendarEvent, Media, BirdStatus
+from server.models import User, Bird, HealthRecord, Station, FeedingLog, CalendarEvent, Media, BirdStatus, AnimalClass
 from server.schemas import (
     TokenResponse,
     BirdSchema,
     BirdCreate,
+    PatientCreate,
+    PatientUpdate,
     HealthRecordCreate,
     HealthRecordSchema,
     FeedingLogCreate,
@@ -105,6 +107,52 @@ async def health_check():
 # BIRD (PATIENT) ENDPOINTS
 # ============================================================================
 
+def _create_patient_record(record: BirdCreate, db):
+    new_bird = Bird(
+        internal_id=record.internal_id,
+        ring_number=record.ring_number,
+        tag_id=record.tag_id,
+        animal_class=record.animal_class,
+        species=record.species,
+        gender=record.gender,
+        estimated_age=record.estimated_age,
+        found_location=record.found_location,
+        finder_name=record.finder_name,
+        finder_contact=record.finder_contact,
+        gps_lat=record.gps_lat,
+        gps_lon=record.gps_lon,
+        station_id=record.station_id,
+        notes=record.notes,
+        admission_date=datetime.utcnow(),
+        status=BirdStatus.IN_TREATMENT,
+    )
+    db.add(new_bird)
+    db.commit()
+    db.refresh(new_bird)
+    return new_bird
+
+
+def _update_patient_record(patient_id: int, update: BirdUpdate, db):
+    bird = db.query(Bird).filter(Bird.id == patient_id).first()
+    if not bird:
+        return None
+
+    if update.status is not None:
+        bird.status = update.status
+    if update.enclosure_id is not None:
+        bird.enclosure_id = update.enclosure_id
+    if update.estimated_age is not None:
+        bird.estimated_age = update.estimated_age
+    if update.notes is not None:
+        bird.notes = update.notes
+    if update.release_date is not None:
+        bird.release_date = update.release_date
+
+    bird.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(bird)
+    return bird
+
 @app.post("/birds", response_model=BirdSchema, tags=["Patients"])
 async def create_bird(
     bird: BirdCreate,
@@ -115,31 +163,53 @@ async def create_bird(
     user = verify_token(token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    return _create_patient_record(bird, db)
 
-    new_bird = Bird(
-        internal_id=bird.internal_id,
-        ring_number=bird.ring_number,
-        tag_id=bird.tag_id,
-        animal_class=bird.animal_class,
-        species=bird.species,
-        gender=bird.gender,
-        estimated_age=bird.estimated_age,
-        found_location=bird.found_location,
-        finder_name=bird.finder_name,
-        finder_contact=bird.finder_contact,
-        gps_lat=bird.gps_lat,
-        gps_lon=bird.gps_lon,
-        station_id=bird.station_id,
-        notes=bird.notes,
-        admission_date=datetime.utcnow(),
-        status=BirdStatus.IN_TREATMENT,
-    )
+@app.post("/patients", response_model=BirdSchema, tags=["Patients"])
+async def create_patient(
+    patient: PatientCreate,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Create new patient record under generic patient endpoint."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return _create_patient_record(patient, db)
 
-    db.add(new_bird)
-    db.commit()
-    db.refresh(new_bird)
+@app.patch("/birds/{bird_id}", response_model=BirdSchema, tags=["Patients"])
+async def update_bird(
+    bird_id: int,
+    bird_update: BirdUpdate,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Update patient record."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    return new_bird
+    bird = _update_patient_record(bird_id, bird_update, db)
+    if not bird:
+        raise HTTPException(status_code=404, detail="Bird not found")
+    return bird
+
+@app.patch("/patients/{patient_id}", response_model=BirdSchema, tags=["Patients"])
+async def update_patient(
+    patient_id: int,
+    patient_update: PatientUpdate,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Update patient record through the generic endpoint."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    bird = _update_patient_record(patient_id, patient_update, db)
+    if not bird:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    return bird
 
 @app.get("/birds/{bird_id}", response_model=BirdSchema, tags=["Patients"])
 async def get_bird(
@@ -157,15 +227,32 @@ async def get_bird(
         raise HTTPException(status_code=404, detail="Bird not found")
     return bird
 
+@app.get("/patients/{patient_id}", response_model=BirdSchema, tags=["Patients"])
+async def get_patient(
+    patient_id: int,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Get patient details through the generic endpoint."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    bird = db.query(Bird).filter(Bird.id == patient_id).first()
+    if not bird:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    return bird
+
 @app.get("/birds", tags=["Patients"])
 async def list_birds(
     skip: int = 0,
     limit: int = 100,
     station_id: Optional[str] = None,
+    animal_class: Optional[AnimalClass] = None,
     token: str = Depends(oauth2_scheme),
     db = Depends(get_db)
 ):
-    """List all patients, optionally filtered by station."""
+    """List all patients, optionally filtered by station or animal class."""
     user = verify_token(token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -173,10 +260,24 @@ async def list_birds(
     query = db.query(Bird)
     if station_id:
         query = query.filter(Bird.station_id == station_id)
+    if animal_class:
+        query = query.filter(Bird.animal_class == animal_class)
 
     total = query.count()
     birds = query.offset(skip).limit(limit).all()
-    return {"birds": birds, "total": total}
+    return {"patients": birds, "total": total}
+
+@app.get("/patients", tags=["Patients"])
+async def list_patients(
+    skip: int = 0,
+    limit: int = 100,
+    station_id: Optional[str] = None,
+    animal_class: Optional[AnimalClass] = None,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """List all patients, optionally filtered by station or animal class."""
+    return await list_birds(skip, limit, station_id, animal_class, token, db)
 
 @app.post("/sync", tags=["Sync"])
 async def sync_station(
@@ -218,7 +319,7 @@ async def sync_station(
             errors.append({"action": action, "error": "Missing action or entity_type"})
             continue
 
-        if action_type == "create" and entity_type == "bird":
+        if action_type == "create" and entity_type in ("bird", "patient", "animal"):
             try:
                 bird = Bird(
                     internal_id=entity_data.get("internal_id", f"unknown-{datetime.utcnow().timestamp()}"),
@@ -351,10 +452,12 @@ async def get_overview_report(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    total_birds = db.query(Bird).count()
+    total_patients = db.query(Bird).count()
     total_stations = db.query(Station).count()
     total_events = db.query(CalendarEvent).count()
     total_media = db.query(Media).count()
+    total_ready_for_release = db.query(Bird).filter(Bird.status == BirdStatus.READY_FOR_RELEASE).count()
+    total_deceased = db.query(Bird).filter(Bird.status == BirdStatus.DECEASED).count()
 
     animal_counts = {
         "bird": db.query(Bird).filter(Bird.animal_class == "bird").count(),
@@ -364,11 +467,40 @@ async def get_overview_report(
     }
 
     return {
-        "total_birds": total_birds,
+        "total_birds": total_patients,
+        "total_patients": total_patients,
         "total_stations": total_stations,
         "total_calendar_events": total_events,
         "total_media_files": total_media,
+        "total_ready_for_release": total_ready_for_release,
+        "total_deceased": total_deceased,
         "animal_class_counts": animal_counts,
+    }
+
+@app.get("/reports/alerts", tags=["Reports"])
+async def get_report_alerts(
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Return alert counts for care and release readiness."""
+    user = verify_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    ready_count = db.query(Bird).filter(Bird.status == BirdStatus.READY_FOR_RELEASE).count()
+    deceased_count = db.query(Bird).filter(Bird.status == BirdStatus.DECEASED).count()
+    in_treatment_count = db.query(Bird).filter(Bird.status == BirdStatus.IN_TREATMENT).count()
+
+    return {
+        "ready_for_release": ready_count,
+        "deceased": deceased_count,
+        "in_treatment": in_treatment_count,
+        "animal_class_counts": {
+            "bird": db.query(Bird).filter(Bird.animal_class == "bird").count(),
+            "reptile": db.query(Bird).filter(Bird.animal_class == "reptile").count(),
+            "mammal": db.query(Bird).filter(Bird.animal_class == "mammal").count(),
+            "other": db.query(Bird).filter(Bird.animal_class == "other").count(),
+        },
     }
 
 @app.post("/birds/{bird_id}/media", response_model=MediaSchema, tags=["Media"])
@@ -423,6 +555,46 @@ async def list_bird_media(
 
     medias = db.query(Media).filter(Media.bird_id == bird_id).all()
     return medias
+
+@app.post("/patients/{patient_id}/media", response_model=MediaSchema, tags=["Media"])
+async def upload_patient_media(
+    patient_id: int,
+    file: UploadFile = File(...),
+    description: Optional[str] = Form(None),
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Upload a media file for a patient record through the generic endpoint."""
+    return await upload_bird_media(patient_id, file, description, token, db)
+
+@app.get("/patients/{patient_id}/media", response_model=List[MediaSchema], tags=["Media"])
+async def list_patient_media(
+    patient_id: int,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """List uploaded media files for a patient."""
+    return await list_bird_media(patient_id, token, db)
+
+@app.post("/patients/{patient_id}/health-records", response_model=HealthRecordSchema, tags=["Health"])
+async def create_patient_health_record(
+    patient_id: int,
+    record_data: HealthRecordCreate,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Create daily health check record for a patient."""
+    return await create_health_record(patient_id, record_data, token, db)
+
+@app.post("/patients/{patient_id}/feeding-logs", response_model=FeedingLogSchema, tags=["Feeding"])
+async def create_patient_feeding_log(
+    patient_id: int,
+    log_data: FeedingLogCreate,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Create feeding log entry for a patient."""
+    return await create_feeding_log(patient_id, log_data, token, db)
 
 # ============================================================================
 # CALENDAR ENDPOINTS
@@ -590,6 +762,15 @@ async def get_ai_recommendations(
 
     recommendations = ai.generate_care_recommendations(bird_data, health_history)
     return {"recommendations": recommendations}
+
+@app.post("/patients/{patient_id}/recommendations", tags=["AI"])
+async def get_patient_recommendations(
+    patient_id: int,
+    token: str = Depends(oauth2_scheme),
+    db = Depends(get_db)
+):
+    """Get LLM-based care recommendations for a patient."""
+    return await get_ai_recommendations(patient_id, token, db)
 
 @app.post("/research/summary", response_model=ResearchOutput, tags=["Research"])
 async def research_summary(

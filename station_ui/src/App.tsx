@@ -49,12 +49,13 @@ function App() {
   const [queue, setQueue] = useState<QueueItem[]>([])
   const [syncResult, setSyncResult] = useState<string>('')
   const [statusMessage, setStatusMessage] = useState('Ready')
-  const [birdInternalId, setBirdInternalId] = useState('')
-  const [birdAnimalClass, setBirdAnimalClass] = useState('bird')
-  const [birdSpecies, setBirdSpecies] = useState('peregrine_falcon')
-  const [healthBirdId, setHealthBirdId] = useState(1)
+  const [patientInternalId, setPatientInternalId] = useState('')
+  const [patientAnimalClass, setPatientAnimalClass] = useState('bird')
+  const [patientSpecies, setPatientSpecies] = useState('peregrine_falcon')
+  const [healthPatientId, setHealthPatientId] = useState(1)
   const [healthWeight, setHealthWeight] = useState(0)
   const [healthBehavior, setHealthBehavior] = useState('')
+  const [selectedTab, setSelectedTab] = useState<'bird' | 'reptile' | 'mammal'>('bird')
   const [calendarTitle, setCalendarTitle] = useState('')
   const [calendarDate, setCalendarDate] = useState('')
   const [calendarTime, setCalendarTime] = useState('12:00')
@@ -82,8 +83,46 @@ function App() {
     setStatusMessage(`Queued ${item.action} ${item.entity_type}`)
   }
 
-  const createBird = () => {
-    if (!birdInternalId) {
+  const speciesOptions: Record<string, string[]> = {
+    bird: [
+      'peregrine_falcon',
+      'eurasian_eagle_owl',
+      'red_kite',
+      'common_kestrel',
+      'common_buzzard',
+      'eurasian_sparrowhawk',
+    ],
+    reptile: [
+      'green_iguana',
+      'ball_python',
+      'corn_snake',
+      'bearded_dragon',
+      'monitor_lizard',
+    ],
+    mammal: [
+      'red_fox',
+      'european_hedgehog',
+      'common_wallaby',
+      'roe_deer',
+      'badger',
+    ],
+  }
+
+  const selectDefaultSpecies = (animalClass: 'bird' | 'reptile' | 'mammal') => {
+    if (animalClass === 'reptile') return 'green_iguana'
+    if (animalClass === 'mammal') return 'red_fox'
+    return 'peregrine_falcon'
+  }
+
+  const handleTabChange = (tab: 'bird' | 'reptile' | 'mammal') => {
+    setSelectedTab(tab)
+    setPatientAnimalClass(tab)
+    setPatientSpecies(selectDefaultSpecies(tab))
+    setStatusMessage(`Selected ${tab === 'bird' ? 'Bird' : tab === 'reptile' ? 'Reptile' : 'Mammal'} tab.`)
+  }
+
+  const createPatient = () => {
+    if (!patientInternalId) {
       setStatusMessage('Please enter an internal ID.')
       return
     }
@@ -91,18 +130,18 @@ function App() {
     addQueueItem({
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       action: 'create',
-      entity_type: 'bird',
+      entity_type: 'patient',
       data: {
-        animal_class: birdAnimalClass,
-        internal_id: birdInternalId,
-        species: birdSpecies,
+        animal_class: patientAnimalClass,
+        internal_id: patientInternalId,
+        species: patientSpecies,
       },
     })
 
-    setBirdInternalId('')
-    setBirdAnimalClass('bird')
-    setQrCodeValue('')
-    setStatusMessage('Bird saved locally and queued for sync.')
+    setPatientInternalId('')
+    setPatientAnimalClass(selectedTab)
+    setPatientSpecies(selectDefaultSpecies(selectedTab))
+    setStatusMessage('Patient saved locally and queued for sync.')
   }
 
   const recordHealth = () => {
@@ -111,7 +150,8 @@ function App() {
       action: 'create',
       entity_type: 'health_record',
       data: {
-        bird_id: healthBirdId,
+        bird_id: healthPatientId,
+        patient_id: healthPatientId,
         weight_grams: healthWeight,
         behavior: healthBehavior,
         recorded_at: new Date().toISOString(),
@@ -137,7 +177,7 @@ function App() {
     formData.append('description', mediaDescription)
 
     try {
-      const response = await fetch(`${serverUrl}/birds/${healthBirdId}/media`, {
+const response = await fetch(`${serverUrl}/patients/${healthPatientId}/media`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -177,7 +217,8 @@ function App() {
         end_at: startAt,
         all_day: false,
         location: calendarLocation,
-        bird_id: healthBirdId,
+        bird_id: healthPatientId,
+        patient_id: healthPatientId,
       },
     })
 
@@ -305,17 +346,32 @@ function App() {
       </section>
 
       <section>
+        <h2>Maintain records by animal class</h2>
+        <div className="button-row">
+          <button type="button" className={selectedTab === 'bird' ? 'primary' : 'secondary'} onClick={() => handleTabChange('bird')}>
+            Birds
+          </button>
+          <button type="button" className={selectedTab === 'reptile' ? 'primary' : 'secondary'} onClick={() => handleTabChange('reptile')}>
+            Reptiles
+          </button>
+          <button type="button" className={selectedTab === 'mammal' ? 'primary' : 'secondary'} onClick={() => handleTabChange('mammal')}>
+            Mammals
+          </button>
+        </div>
+      </section>
+
+      <section>
         <h2>Offline Actions</h2>
         <div className="grid">
           <div className="card">
-            <h3>Create Bird Record</h3>
+            <h3>Create {selectedTab === 'bird' ? 'Bird' : selectedTab === 'reptile' ? 'Reptile' : 'Mammal'} Patient Record</h3>
             <label>
               Internal ID
-              <input value={birdInternalId} onChange={(e) => setBirdInternalId(e.target.value)} />
+              <input value={patientInternalId} onChange={(e) => setPatientInternalId(e.target.value)} />
             </label>
             <label>
               Animal class
-              <select value={birdAnimalClass} onChange={(e) => setBirdAnimalClass(e.target.value)}>
+              <select value={patientAnimalClass} onChange={(e) => setPatientAnimalClass(e.target.value as 'bird' | 'reptile' | 'mammal') }>
                 <option value="bird">Bird</option>
                 <option value="reptile">Reptile</option>
                 <option value="mammal">Mammal</option>
@@ -324,19 +380,23 @@ function App() {
             </label>
             <label>
               Species
-              <input value={birdSpecies} onChange={(e) => setBirdSpecies(e.target.value)} />
+              <select value={patientSpecies} onChange={(e) => setPatientSpecies(e.target.value)}>
+                {(speciesOptions[selectedTab] || []).map((option) => (
+                  <option key={option} value={option}>{option.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
             </label>
-            <button onClick={createBird}>Save locally</button>
+            <button onClick={createPatient}>Save locally</button>
           </div>
 
           <div className="card">
             <h3>Record Health Check</h3>
             <label>
-              Bird ID
+              Patient ID
               <input
                 type="number"
-                value={healthBirdId}
-                onChange={(e) => setHealthBirdId(Number(e.target.value))}
+                value={healthPatientId}
+                onChange={(e) => setHealthPatientId(Number(e.target.value))}
               />
             </label>
             <label>
@@ -357,11 +417,11 @@ function App() {
           <div className="card">
             <h3>Upload Media</h3>
             <label>
-              Bird ID
+              Patient ID
               <input
                 type="number"
-                value={healthBirdId}
-                onChange={(e) => setHealthBirdId(Number(e.target.value))}
+                value={healthPatientId}
+                onChange={(e) => setHealthPatientId(Number(e.target.value))}
               />
             </label>
             <label>

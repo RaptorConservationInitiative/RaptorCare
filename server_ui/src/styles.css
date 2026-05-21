@@ -72,6 +72,18 @@ button.primary {
   min-width: 180px;
 }
 
+.map-card {
+  margin-top: 16px;
+}
+
+.leaflet-map {
+  width: 100%;
+  height: 420px;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-top: 16px;
+}
+
 .card {
   background: #f1f5f9;
   border-radius: 14px;

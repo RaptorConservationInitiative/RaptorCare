@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
 type GPUInfo = {
   device_id: number
@@ -28,13 +30,14 @@ type StationInfo = {
   contact_phone?: string
 }
 
-type BirdInfo = {
+type PatientInfo = {
   id: number
   internal_id: string
   species: string
   status: string
   station_id: string
   admission_date: string
+  animal_class?: string
 }
 
 type CalendarEventInfo = {
@@ -60,8 +63,9 @@ function App() {
   const [token, setToken] = useState('')
   const [stations, setStations] = useState<StationInfo[]>([])
   const [selectedStation, setSelectedStation] = useState('station_001')
+  const [selectedTab, setSelectedTab] = useState<'bird' | 'reptile' | 'mammal'>('bird')
   const [stationData, setStationData] = useState('No station data loaded yet.')
-  const [birds, setBirds] = useState<BirdInfo[]>([])
+  const [patients, setPatients] = useState<PatientInfo[]>([])
   const [events, setEvents] = useState<CalendarEventInfo[]>([])
   const [gpuStatus, setGpuStatus] = useState<GPUInfo[] | null>(null)
   const [overviewReport, setOverviewReport] = useState<Record<string, any> | null>(null)
@@ -70,13 +74,53 @@ function App() {
   const [researchNotes, setResearchNotes] = useState('')
   const [language, setLanguage] = useState('en')
   const [statusMessage, setStatusMessage] = useState('Ready')
+  const mapContainerRef = useRef<HTMLDivElement | null>(null)
+  const leafletMapRef = useRef<L.Map | null>(null)
+  const markerLayerRef = useRef<L.LayerGroup | null>(null)
 
-  const headers = token
+  const headers: Record<string, string> = token
     ? {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       }
     : { 'Content-Type': 'application/json' }
+
+  useEffect(() => {
+    if (!mapContainerRef.current || leafletMapRef.current) return
+
+    const defaultIcon = L.icon({
+      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41],
+    })
+    L.Marker.prototype.options.icon = defaultIcon
+
+    leafletMapRef.current = L.map(mapContainerRef.current, {
+      center: [20, 0],
+      zoom: 2,
+      zoomControl: true,
+      scrollWheelZoom: true,
+    })
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(leafletMapRef.current)
+
+    markerLayerRef.current = L.layerGroup().addTo(leafletMapRef.current)
+  }, [])
+
+  useEffect(() => {
+    if (!leafletMapRef.current) return
+    const selectedStationInfo = stations.find((station) => station.station_id === selectedStation)
+    if (selectedStationInfo?.gps_lat != null && selectedStationInfo?.gps_lon != null) {
+      leafletMapRef.current.flyTo([selectedStationInfo.gps_lat, selectedStationInfo.gps_lon], 12, {
+        duration: 1.2,
+      })
+    }
+  }, [selectedStation, stations])
 
   const fetchGpuStatus = async () => {
     if (!token) {
@@ -117,11 +161,13 @@ function App() {
       }
 
       const data = await response.json()
-      setStations(data.stations || [])
+      const stationData = data.stations || []
+      setStations(stationData)
       setStatusMessage('Station overview loaded.')
-      if (data.stations?.length) {
-        setSelectedStation(data.stations[0].station_id)
+      if (stationData.length) {
+        setSelectedStation(stationData[0].station_id)
       }
+      updateStationMap(stationData)
     } catch (error: any) {
       setStatusMessage(`Failed to load stations: ${error.message}`)
     }
@@ -148,6 +194,12 @@ function App() {
       setOverviewReport(null)
       setStatusMessage(`Failed to load overview report: ${error.message}`)
     }
+  }
+
+  const handleTabChange = (tab: 'bird' | 'reptile' | 'mammal') => {
+    setSelectedTab(tab)
+    fetchPatients(selectedStation, tab)
+    setStatusMessage(`Showing ${tab === 'bird' ? 'Bird' : tab === 'reptile' ? 'Reptile' : 'Mammal'} records.`)
   }
 
   const requestResearch = async (endpoint: string) => {
@@ -189,16 +241,17 @@ function App() {
     }
   }
 
-  const fetchBirds = async (stationId?: string) => {
+  const fetchPatients = async (stationId?: string, animalClass?: string) => {
     if (!token) {
-      setStatusMessage('Please provide a bearer token to fetch bird records.')
+      setStatusMessage('Please provide a bearer token to fetch patient records.')
       return
     }
 
     try {
-      const path = stationId
-        ? `${serverUrl}/birds?station_id=${encodeURIComponent(stationId)}&limit=100`
-        : `${serverUrl}/birds?limit=100`
+      const base = stationId
+        ? `${serverUrl}/patients?station_id=${encodeURIComponent(stationId)}&limit=100`
+        : `${serverUrl}/patients?limit=100`
+      const path = animalClass ? `${base}&animal_class=${encodeURIComponent(animalClass)}` : base
       const response = await fetch(path, {
         headers,
       })
@@ -207,11 +260,12 @@ function App() {
         throw new Error(`${response.status} ${text}`)
       }
       const data = await response.json()
-      setBirds(data.birds || [])
-      setStatusMessage(`Loaded ${data.birds?.length ?? 0} bird records.`)
+      setPatients(data.patients || data.birds || [])
+      const count = data.patients?.length ?? data.birds?.length ?? 0
+      setStatusMessage(`Loaded ${count} patient records.`)
     } catch (error: any) {
-      setBirds([])
-      setStatusMessage(`Failed to load birds: ${error.message}`)
+      setPatients([])
+      setStatusMessage(`Failed to load patients: ${error.message}`)
     }
   }
 
@@ -253,6 +307,29 @@ function App() {
         `Queue failed: ${station.sync_stats.failed}\n` +
         `Utilization: ${station.sync_stats.queue_utilization_percent.toFixed(1)}%`
     )
+  }
+
+  const updateStationMap = (stationData: StationInfo[]) => {
+    if (!markerLayerRef.current || !leafletMapRef.current) return
+    markerLayerRef.current.clearLayers()
+    const bounds: L.LatLngTuple[] = []
+
+    stationData.forEach((station) => {
+      if (station.gps_lat != null && station.gps_lon != null) {
+        const marker = L.marker([station.gps_lat, station.gps_lon])
+        marker.bindPopup(`<strong>${station.name}</strong><br/>${station.location}`)
+        marker.on('click', () => {
+          setSelectedStation(station.station_id)
+          setStatusMessage(`Selected station ${station.name} from map.`)
+        })
+        marker.addTo(markerLayerRef.current!)
+        bounds.push([station.gps_lat, station.gps_lon])
+      }
+    })
+
+    if (bounds.length) {
+      leafletMapRef.current.fitBounds(bounds, { padding: [32, 32], maxZoom: 12 })
+    }
   }
 
   return (
@@ -328,25 +405,22 @@ function App() {
             </select>
           </label>
           <button className="primary" onClick={loadStationData}>Show station details</button>
-          <button className="primary" onClick={() => fetchBirds(selectedStation)}>Load birds for selected station</button>
+          <button className="primary" onClick={() => fetchPatients(selectedStation)}>Load patients for selected station</button>
           <button className="primary" onClick={() => fetchCalendarEvents(selectedStation)}>Load schedule</button>
         </div>
         <pre>{stationData}</pre>
-        {stations.find((item) => item.station_id === selectedStation)?.gps_lat !== undefined ? (
+        {stations.some((item) => item.gps_lat !== undefined && item.gps_lon !== undefined) ? (
           <div className="map-card">
-            <h3>Selected station location</h3>
-            <iframe
-              title="Station map"
-              width="100%"
-              height="350"
-              src={`https://www.openstreetmap.org/export/embed.html?bbox=${(stations.find((item) => item.station_id === selectedStation)?.gps_lon ?? 0) - 0.01}%2C${(stations.find((item) => item.station_id === selectedStation)?.gps_lat ?? 0) - 0.01}%2C${(stations.find((item) => item.station_id === selectedStation)?.gps_lon ?? 0) + 0.01}%2C${(stations.find((item) => item.station_id === selectedStation)?.gps_lat ?? 0) + 0.01}&layer=mapnik&marker=${stations.find((item) => item.station_id === selectedStation)?.gps_lat ?? 0}%2C${stations.find((item) => item.station_id === selectedStation)?.gps_lon ?? 0}`}
-            />
+            <h3>Station map</h3>
+            <div ref={mapContainerRef} className="leaflet-map" />
+            <p>Click a marker to select a station and see its details.</p>
           </div>
         ) : (
-          <p>No location data available for the selected station.</p>
+          <p>No location data available for the selected station map.</p>
         )}
         <div className="queue-list">
           {stations.map((station) => (
+            <div key={station.station_id} className="queue-item">
               <strong>{station.name}</strong>
               <p>ID: {station.station_id}</p>
               <p>Pending: {station.sync_stats.pending}</p>
@@ -359,15 +433,27 @@ function App() {
 
       <section>
         <h2>Patient List</h2>
-        <button className="primary" onClick={() => fetchBirds(selectedStation)}>Refresh patient list</button>
+        <div className="button-row">
+          <button type="button" className={selectedTab === 'bird' ? 'primary' : 'secondary'} onClick={() => handleTabChange('bird')}>
+            Birds
+          </button>
+          <button type="button" className={selectedTab === 'reptile' ? 'primary' : 'secondary'} onClick={() => handleTabChange('reptile')}>
+            Reptiles
+          </button>
+          <button type="button" className={selectedTab === 'mammal' ? 'primary' : 'secondary'} onClick={() => handleTabChange('mammal')}>
+            Mammals
+          </button>
+        </div>
+        <button className="primary" onClick={() => fetchPatients(selectedStation, selectedTab)}>Refresh {selectedTab === 'bird' ? 'bird' : selectedTab === 'reptile' ? 'reptile' : 'mammal'} list</button>
         <div className="queue-list">
-          {birds.map((bird) => (
-            <div key={bird.id} className="queue-item">
-              <strong>{bird.internal_id}</strong>
-              <p>Species: {bird.species}</p>
-              <p>Status: {bird.status}</p>
-              <p>Station: {bird.station_id}</p>
-              <p>Admitted: {new Date(bird.admission_date).toLocaleDateString()}</p>
+          {patients.map((patient) => (
+            <div key={patient.id} className="queue-item">
+              <strong>{patient.internal_id}</strong>
+              <p>Type: {patient.animal_class ?? 'unknown'}</p>
+              <p>Species: {patient.species}</p>
+              <p>Status: {patient.status}</p>
+              <p>Station: {patient.station_id}</p>
+              <p>Admitted: {new Date(patient.admission_date).toLocaleDateString()}</p>
             </div>
           ))}
         </div>
@@ -381,7 +467,7 @@ function App() {
             <div key={event.id} className="queue-item">
               <strong>{event.title}</strong>
               <p>Station: {event.station_id}</p>
-              <p>Bird ID: {event.bird_id ?? 'n/a'}</p>
+              <p>Patient ID: {event.bird_id ?? 'n/a'}</p>
               <p>{new Date(event.start_at).toLocaleString()} {event.all_day ? '(all day)' : ''}</p>
               <p>Location: {event.location ?? 'Not specified'}</p>
               <p>{event.description}</p>

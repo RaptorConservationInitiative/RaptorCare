@@ -28,7 +28,7 @@
 ## 📋 Core Modules
 
 ### 1. **Patient Management**
-- Bird identification (internal ID, ring number, tag ID)
+- Patient identification for birds, reptiles and mammals (internal ID, ring number, tag ID)
 - Species, gender, age tracking
 - Admission and release management
 - Multi-status workflow (in treatment → ready for release → released/deceased)
