@@ -28,7 +28,7 @@ add-apt-repository ppa:deadsnakes/ppa -y
 
 echo_step "Updating system packages..."
 apt-get update
-apt-get install -y python3.12 python3.12-venv python3.12-dev git curl wget nodejs npm
+apt-get install -y python3.12 python3.12-venv python3.12-dev python3.12-distutils git curl wget nodejs npm
 
 echo_step "Preparing station repository..."
 if [[ -f "$REPO_ROOT/station/app.py" ]]; then
@@ -60,6 +60,10 @@ else
 fi
 
 source "$STATION_DIR/venv/bin/activate"
+if ! python3.12 -m pip --version >/dev/null 2>&1; then
+    echo_step "Bootstrapping pip for Python 3.12..."
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
+fi
 python3.12 -m pip install --upgrade pip setuptools wheel
 
 echo_step "Installing Python dependencies..."

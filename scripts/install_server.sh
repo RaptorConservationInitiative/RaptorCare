@@ -39,7 +39,7 @@ apt-get update
 
 # Base packages
 echo_step "Installing base packages..."
-apt-get install -y python3.12 python3.12-pip python3.12-venv python3.12-dev git curl wget postgresql postgresql-contrib libpq-dev nodejs npm
+apt-get install -y python3.12 python3.12-venv python3.12-dev python3.12-distutils git curl wget postgresql libpq-dev nodejs npm
 
 # Create or use current repository path
 cd "$REPO_ROOT"
@@ -53,6 +53,10 @@ else
 fi
 
 source "$VENV_DIR/bin/activate"
+if ! python3.12 -m pip --version >/dev/null 2>&1; then
+    echo_step "Bootstrapping pip for Python 3.12..."
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
+fi
 python3.12 -m pip install --upgrade pip setuptools wheel
 python3.12 -m pip install -r "$REPO_ROOT/requirements.txt"
 
