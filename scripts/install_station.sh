@@ -21,6 +21,11 @@ fi
 echo "🦅 RaptorCare Station Client Installation"
 echo "========================================="
 
+echo_step "Adding deadsnakes PPA for Python 3.12..."
+apt-get update
+apt-get install -y software-properties-common
+add-apt-repository ppa:deadsnakes/ppa -y
+
 echo_step "Updating system packages..."
 apt-get update
 apt-get install -y python3.12 python3.12-venv python3.12-dev git curl wget nodejs npm
