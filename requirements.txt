@@ -20,7 +20,7 @@ alembic==1.13.1
 psycopg2-binary==2.9.9
 
 # =========================
-# HTTP / UTIL
+# HTTP
 # =========================
 requests==2.31.0
 
@@ -37,15 +37,9 @@ numpy==1.26.4
 pandas==2.2.2
 
 # =========================
-# PYTORCH (INSTALLED SEPARATELY VIA CUDA INDEX)
+# LLM STACK (FIXED)
 # =========================
-# DO NOT INSTALL VIA requirements.txt:
-# torch / torchvision / torchaudio
-
-# =========================
-# LLM STACK
-# =========================
-langchain==0.1.1
-langchain-community==0.0.19
+langchain==0.1.17
+langchain-community==0.0.33
 
 ollama==0.1.0
