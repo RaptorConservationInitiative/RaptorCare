@@ -1,18 +1,52 @@
+# =========================
+# CORE API STACK
+# =========================
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
+
+# =========================
+# AUTH
+# =========================
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
+
+# =========================
+# DATABASE
+# =========================
 sqlalchemy==2.0.23
 alembic==1.13.1
 psycopg2-binary==2.9.9
+
+# =========================
+# UTIL
+# =========================
 requests==2.31.0
+
+# =========================
+# PYDANTIC
+# =========================
 pydantic==2.5.0
 pydantic-settings==2.1.0
-torch==2.12.0
+
+# =========================
+# NUMPY / PANDAS
+# =========================
 numpy==1.26.4
 pandas==2.2.2
+
+# =========================
+# PYTORCH (CUDA 11.8 - DUAL GPU SAFE)
+# =========================
+torch==2.1.2+cu118
+torchvision==0.16.2+cu118
+torchaudio==2.1.2+cu118
+
+# =========================
+# LLM STACK
+# =========================
 langchain==0.1.1
-langchain-community==0.0.10
+langchain-community==0.0.19
+
 ollama==0.1.0
-python-dotenv==1.0.0
