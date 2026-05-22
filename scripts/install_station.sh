@@ -28,7 +28,7 @@ add-apt-repository ppa:deadsnakes/ppa -y
 
 echo_step "Updating system packages..."
 apt-get update
-apt-get install -y python3.12 python3.12-venv python3.12-dev python3.12-distutils git curl wget nodejs npm
+apt-get install -y python3.12 python3.12-venv python3.12-dev git curl wget nodejs npm
 
 echo_step "Preparing station repository..."
 if [[ -f "$REPO_ROOT/station/app.py" ]]; then

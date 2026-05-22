@@ -39,7 +39,7 @@ apt-get update
 
 # Base packages
 echo_step "Installing base packages..."
-apt-get install -y python3.12 python3.12-venv python3.12-dev python3.12-distutils git curl wget postgresql libpq-dev nodejs npm
+apt-get install -y python3.12 python3.12-venv python3.12-dev git curl wget postgresql libpq-dev nodejs npm
 
 # Create or use current repository path
 cd "$REPO_ROOT"
