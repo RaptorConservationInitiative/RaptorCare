@@ -7,7 +7,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET_DIR="/opt/raptorcare-station"
 STATION_SERVICE_FILE="/etc/systemd/system/raptorcare-station.service"
-PYTHON_BIN="python3"
+PYTHON_BIN="python3.12"
 
 function echo_step() {
     echo -e "\n🔧 $1"
@@ -23,7 +23,7 @@ echo "========================================="
 
 echo_step "Updating system packages..."
 apt-get update
-apt-get install -y python3 python3-venv python3-dev git curl wget nodejs npm
+apt-get install -y python3.12 python3.12-venv python3.12-dev git curl wget nodejs npm
 
 echo_step "Preparing station repository..."
 if [[ -f "$REPO_ROOT/station/app.py" ]]; then
@@ -55,11 +55,11 @@ else
 fi
 
 source "$STATION_DIR/venv/bin/activate"
-python3 -m pip install --upgrade pip setuptools wheel
+python3.12 -m pip install --upgrade pip setuptools wheel
 
 echo_step "Installing Python dependencies..."
 if [[ -f "$STATION_DIR/requirements.txt" ]]; then
-    python3 -m pip install -r "$STATION_DIR/requirements.txt"
+    python3.12 -m pip install -r "$STATION_DIR/requirements.txt"
 else
     echo "⚠️  requirements.txt not found in $STATION_DIR"
 fi

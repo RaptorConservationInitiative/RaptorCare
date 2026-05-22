@@ -7,7 +7,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON_BIN="$REPO_ROOT/venv/bin/python3"
 if [ ! -x "$PYTHON_BIN" ]; then
-    PYTHON_BIN="python3"
+    PYTHON_BIN="python3.12"
 fi
 
 echo "🗄️  RaptorCare Database Initialization"

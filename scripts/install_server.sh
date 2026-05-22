@@ -9,7 +9,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$REPO_ROOT/.env"
 EXAMPLE_ENV="$REPO_ROOT/.env.example"
 VENV_DIR="$REPO_ROOT/venv"
-PYTHON_BIN="python3"
+PYTHON_BIN="python3.12"
 
 function echo_step() {
     echo -e "\n🔧 $1"
@@ -35,7 +35,7 @@ apt-get update
 
 # Base packages
 echo_step "Installing base packages..."
-apt-get install -y python3 python3-pip python3-venv python3-dev git curl wget postgresql postgresql-contrib libpq-dev nodejs npm
+apt-get install -y python3.12 python3.12-pip python3.12-venv python3.12-dev git curl wget postgresql postgresql-contrib libpq-dev nodejs npm
 
 # Create or use current repository path
 cd "$REPO_ROOT"
@@ -49,8 +49,8 @@ else
 fi
 
 source "$VENV_DIR/bin/activate"
-python3 -m pip install --upgrade pip setuptools wheel
-python3 -m pip install -r "$REPO_ROOT/requirements.txt"
+python3.12 -m pip install --upgrade pip setuptools wheel
+python3.12 -m pip install -r "$REPO_ROOT/requirements.txt"
 
 echo_step "Installing and building UI packages..."
 if [ -d "$REPO_ROOT/server_ui" ]; then

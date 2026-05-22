@@ -3,7 +3,7 @@
 
 **Status**: 🚀 In Active Development  
 **Version**: 0.1.0  
-**Python**: 3.9+
+**Python**: 3.12+
 
 ---
 
@@ -106,7 +106,7 @@ Station Clients (Offline-First) Central Server ┌──────────
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.9+
+- Python 3.12+
 - PostgreSQL 12+
 - Node.js 16+
 - Ollama (for LLM)
