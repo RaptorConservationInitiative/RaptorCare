@@ -59,26 +59,16 @@ else
     echo "✅ Virtual environment already exists"
 fi
 
-# Activate venv
 source "$STATION_DIR/venv/bin/activate"
-
-echo_step "Ensuring pip is available (ensurepip bootstrap)..."
-
-# First attempt: ensurepip (preferred)
-$PYTHON_BIN -m ensurepip --upgrade || true
-
-# Fallback: get-pip.py if pip still missing
-if ! python -m pip --version >/dev/null 2>&1; then
-    echo_step "Bootstrapping pip via get-pip.py..."
-    curl -sS https://bootstrap.pypa.io/get-pip.py | $PYTHON_BIN
+if ! python3.12 -m pip --version >/dev/null 2>&1; then
+    echo_step "Bootstrapping pip for Python 3.12..."
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
 fi
-
-echo_step "Upgrading pip tooling..."
-python -m pip install --upgrade pip setuptools wheel
+python3.12 -m pip install --upgrade pip setuptools wheel
 
 echo_step "Installing Python dependencies..."
 if [[ -f "$STATION_DIR/requirements.txt" ]]; then
-    python -m pip install -r "$STATION_DIR/requirements.txt"
+    python3.12 -m pip install -r "$STATION_DIR/requirements.txt"
 else
     echo "⚠️  requirements.txt not found in $STATION_DIR"
 fi

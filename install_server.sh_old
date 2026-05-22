@@ -53,25 +53,12 @@ else
 fi
 
 source "$VENV_DIR/bin/activate"
-
-echo_step "Ensuring pip availability (ensurepip + fallback)..."
-
-# pip check
-if ! python -m pip --version >/dev/null 2>&1; then
-    echo "⚠️ pip missing → trying ensurepip"
-    $PYTHON_BIN -m ensurepip --upgrade || true
+if ! python3.12 -m pip --version >/dev/null 2>&1; then
+    echo_step "Bootstrapping pip for Python 3.12..."
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
 fi
-
-# fallback bootstrap
-if ! python -m pip --version >/dev/null 2>&1; then
-    echo "⚠️ ensurepip failed → bootstrapping pip manually"
-    curl -sS https://bootstrap.pypa.io/get-pip.py | $PYTHON_BIN
-fi
-
-echo_step "Upgrading pip tooling..."
-python -m pip install --upgrade pip setuptools wheel
-
-python -m pip install -r "$REPO_ROOT/requirements.txt"
+python3.12 -m pip install --upgrade pip setuptools wheel
+python3.12 -m pip install -r "$REPO_ROOT/requirements.txt"
 
 echo_step "Installing and building UI packages..."
 if [ -d "$REPO_ROOT/server_ui" ]; then
@@ -219,3 +206,4 @@ The Ollama service is running as:
 
 EOF
 fi
+
