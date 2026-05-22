@@ -20,7 +20,7 @@ alembic==1.13.1
 psycopg2-binary==2.9.9
 
 # =========================
-# UTIL
+# HTTP / UTIL
 # =========================
 requests==2.31.0
 
@@ -37,11 +37,10 @@ numpy==1.26.4
 pandas==2.2.2
 
 # =========================
-# PYTORCH (CUDA 11.8 - DUAL GPU SAFE)
+# PYTORCH (INSTALLED SEPARATELY VIA CUDA INDEX)
 # =========================
-torch==2.1.2+cu118
-torchvision==0.16.2+cu118
-torchaudio==2.1.2+cu118
+# DO NOT INSTALL VIA requirements.txt:
+# torch / torchvision / torchaudio
 
 # =========================
 # LLM STACK
