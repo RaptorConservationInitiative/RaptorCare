@@ -26,6 +26,7 @@ from server.schemas import (
     TokenResponse,
     BirdSchema,
     BirdCreate,
+    BirdUpdate,
     PatientCreate,
     PatientUpdate,
     HealthRecordCreate,
