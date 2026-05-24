@@ -34,9 +34,19 @@ class Settings(BaseSettings):
     # File upload
     UPLOAD_DIR: str = "uploads"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+#    class Config:
+#        env_file = ".env"
+#        env_file_encoding = "utf-8"
+
+
+    # 🧠 IMPORTANT FIX HERE
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"   # <-- DAS FIXT DEIN station_id PROBLEM
+    )
+
+
 
 @lru_cache()
 def get_settings() -> Settings:
