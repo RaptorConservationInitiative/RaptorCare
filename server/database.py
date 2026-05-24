@@ -28,6 +28,9 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def init_db():
     """Initialize database tables"""
     try:
+        # 👇 DAS FEHLT BEI DIR
+        from server import models  # zwingend!
+
         Base.metadata.create_all(bind=engine)
         logger.info("✅ Database tables created/verified")
     except Exception as e:
