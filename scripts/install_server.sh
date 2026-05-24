@@ -78,3 +78,90 @@ echo "✅ PyTorch CUDA installed"
 # =========================
 echo_step "Installing Python dependencies..."
 python -m pip install -r "$REPO_ROOT/requirements.txt"
+
+# -------------------------
+# DATABASE
+# -------------------------
+echo_step "PostgreSQL setup"
+systemctl enable postgresql --now
+
+sudo -u postgres psql <<SQL
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'raptorcare') THEN
+        CREATE ROLE raptorcare LOGIN PASSWORD 'raptorcare_password';
+    END IF;
+END$$;
+
+CREATE DATABASE raptorcare_db OWNER raptorcare;
+SQL
+
+# -------------------------
+# ENV
+# -------------------------
+echo_step ".env setup"
+if [ ! -f "$ENV_FILE" ]; then
+    cp "$EXAMPLE_ENV" "$ENV_FILE"
+fi
+
+# -------------------------
+# DB INIT (CRITICAL MISSING PART)
+# -------------------------
+echo_step "Database schema init"
+if [ -f "$REPO_ROOT/scripts/init_db.sh" ]; then
+    bash "$REPO_ROOT/scripts/init_db.sh"
+else
+    echo "⚠️ init_db.sh missing"
+fi
+
+# -------------------------
+# OLLAMA
+# -------------------------
+echo_step "Ollama"
+if ! command -v ollama >/dev/null 2>&1; then
+    curl -fsSL https://ollama.ai/install.sh | sh
+fi
+
+# -------------------------
+# SYSTEM USER
+# -------------------------
+echo_step "User"
+id -u raptorcare >/dev/null 2>&1 || \
+useradd --system --no-create-home --shell /usr/sbin/nologin raptorcare
+
+chown -R raptorcare:raptorcare "$REPO_ROOT"
+
+# -------------------------
+# SYSTEMD
+# -------------------------
+echo_step "systemd service"
+
+cat > /etc/systemd/system/raptorcare.service <<EOF
+[Unit]
+Description=RaptorCare Server
+After=network.target postgresql.service
+
+[Service]
+User=raptorcare
+WorkingDirectory=$REPO_ROOT
+Environment="PATH=$VENV_DIR/bin"
+ExecStart=$VENV_DIR/bin/uvicorn server.main:app --host 0.0.0.0 --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now raptorcare.service
+
+# -------------------------
+# FINAL CHECK
+# -------------------------
+echo_step "Healthcheck"
+
+sleep 3
+curl -s http://localhost:8000/health || echo "⚠️ API not ready yet"
+
+echo ""
+echo "✅ INSTALL COMPLETE"
