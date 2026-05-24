@@ -40,7 +40,7 @@ echo_step "Updating system packages..."
 apt-get update
 
 echo_step "Installing base packages..."
-apt-get install -y python3.12 python3.12-venv python3.12-dev git curl wget postgresql libpq-dev nodejs npm
+apt-get install -y python3.12 python3.12-venv python3.12-dev git curl wget postgresql libpq-dev nodejs npm zstd
 
 cd "$REPO_ROOT"
 
