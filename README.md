@@ -328,7 +328,10 @@ This is an active development project. Areas for contribution:
 
 📄 License
 
-(License to be determined)
+RaptorCare is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License.
+
+Commercial use of this software, including selling, hosting as a paid service, or embedding it into commercial products, is not permitted without explicit written permission.
+
 
 🙏 Acknowledgments
 
