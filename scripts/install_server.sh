@@ -26,6 +26,16 @@ fi
 echo "🦅 RaptorCare Installation (Production Mode)"
 echo "===================================="
 
+# RaptorCare directories
+# =========================
+
+UPLOAD_DIR="/var/lib/raptorcare/uploads"
+
+echo "📁 Creating upload directory..."
+sudo mkdir -p "$UPLOAD_DIR"
+sudo chown -R raptorcare:raptorcare /var/lib/raptorcare
+sudo chmod -R 750 /var/lib/raptorcare
+
 # -------------------------
 # SYSTEM DEPENDENCIES
 # -------------------------
@@ -181,20 +191,28 @@ chown -R raptorcare:raptorcare "$REPO_ROOT"
 # -------------------------
 echo_step "Installing systemd service..."
 
-cat > /etc/systemd/system/raptorcare.service <<EOF
+echo "⚙️ Creating systemd service..."
+
+sudo tee /etc/systemd/system/raptorcare.service > /dev/null <<EOF
 [Unit]
 Description=RaptorCare Server
-After=network.target postgresql.service
+After=network.target
 
 [Service]
-Type=notify
 User=raptorcare
-WorkingDirectory=$REPO_ROOT
-Environment="PATH=$VENV_DIR/bin"
+WorkingDirectory=/opt/raptorcare
 Environment="PYTHONUNBUFFERED=1"
-ExecStart=$VENV_DIR/bin/uvicorn server.main:app --host 0.0.0.0 --port 8000
-Restart=always
-RestartSec=10
+
+ExecStart=/opt/raptorcare/venv/bin/uvicorn server.main:app \
+  --host 0.0.0.0 \
+  --port 8000
+
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=300
+
+# Important for file writes
+ReadWritePaths=/var/lib/raptorcare
 
 [Install]
 WantedBy=multi-user.target
