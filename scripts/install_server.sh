@@ -68,7 +68,7 @@ python -m pip install --upgrade pip setuptools wheel
 echo_step "Installing PyTorch with CUDA 11.8 support..."
 
 python -m pip install \
-  torch==2.1.2+cu118 torchvision==0.16.2+cu118 torchaudio==2.1.2+cu118 \
+  torch==2.2.2+cu118 torchvision==0.17.2+cu118 torchaudio==2.2.2+cu118 \
   --index-url https://download.pytorch.org/whl/cu118
 
 echo "✅ PyTorch CUDA installed"
