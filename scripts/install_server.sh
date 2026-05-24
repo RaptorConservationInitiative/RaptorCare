@@ -199,6 +199,7 @@ Description=RaptorCare Server
 After=network.target
 
 [Service]
+Type=simple
 User=raptorcare
 WorkingDirectory=/opt/raptorcare
 Environment="PYTHONUNBUFFERED=1"
@@ -209,7 +210,7 @@ ExecStart=/opt/raptorcare/venv/bin/uvicorn server.main:app \
 
 Restart=on-failure
 RestartSec=5
-TimeoutStartSec=300
+TimeoutStartSec=500
 
 # Important for file writes
 ReadWritePaths=/var/lib/raptorcare
