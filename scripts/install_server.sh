@@ -220,7 +220,16 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now raptorcare.service
+#systemctl enable --now raptorcare.service
+
+systemctl enable raptorcare.service
+
+echo "🚀 Starting service..."
+if ! systemctl start raptorcare.service; then
+    echo "⚠️ Service failed to start (see logs):"
+    systemctl status raptorcare.service --no-pager || true
+    journalctl -xeu raptorcare.service --no-pager || true
+fi
 
 # -------------------------
 # OLLAMA SERVICE
