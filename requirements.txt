@@ -40,6 +40,6 @@ pandas==2.2.2
 # LLM STACK (FIXED)
 # =========================
 langchain==0.1.17
-langchain-community==0.0.33
+langchain-community==0.0.38
 
 ollama==0.1.0
