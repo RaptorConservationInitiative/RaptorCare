@@ -2,6 +2,8 @@
 
 # RaptorCare Installation Script
 # Installs all required packages, PostgreSQL, virtualenv, and initializes the database.
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
 
 set -euo pipefail
 
@@ -85,16 +87,21 @@ python -m pip install -r "$REPO_ROOT/requirements.txt"
 echo_step "PostgreSQL setup"
 systemctl enable postgresql --now
 
-sudo -u postgres psql <<SQL
+sudo -u postgres psql <<'SQL'
+-- ROLE
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'raptorcare') THEN
-        CREATE ROLE raptorcare LOGIN PASSWORD 'raptorcare_password';
-    END IF;
-END$$;
+   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'raptorcare') THEN
+      CREATE ROLE raptorcare LOGIN PASSWORD 'raptorcare_password';
+   END IF;
+END
+$$;
 
-CREATE DATABASE raptorcare_db OWNER raptorcare;
 SQL
+
+# DATABASE separat (WICHTIG!)
+sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = 'raptorcare_db'" | grep -q 1 || \
+sudo -u postgres psql -c "CREATE DATABASE raptorcare_db OWNER raptorcare;"
 
 # -------------------------
 # ENV
