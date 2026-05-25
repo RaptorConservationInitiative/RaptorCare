@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# RaptorCare Installation Script (FIXED FULL VERSION)
+# RaptorCare Installation Script
 # Installs all required packages, PostgreSQL, virtualenv, and initializes the database.
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
@@ -10,88 +10,72 @@ set -euo pipefail
 PYTHON_BIN="python3.12"
 
 TARGET_DIR="/opt/raptorcare"
-VENV_DIR="$TARGET_DIR/venv"
 ENV_FILE="$TARGET_DIR/.env"
 EXAMPLE_ENV="$TARGET_DIR/.env.example"
-
-UPLOAD_DIR="/var/lib/raptorcare/uploads"
-
-OLLAMA_BIN=""
-
-echo "🦅 RaptorCare Installation (Production Mode)"
-echo "===================================="
-
+VENV_DIR="$TARGET_DIR/venv"
 
 function echo_step() {
     echo -e "\n🔧 $1"
 }
 
-# -------------------------
-# ROOT CHECK
-# -------------------------
 if [[ $EUID -ne 0 ]]; then
-    echo "❌ Run as root: sudo bash install.sh"
+    echo "❌ Please run this script as root: sudo bash scripts/install_server.sh"
     exit 1
 fi
 
-# -------------------------
-# SYSTEM USER
-# -------------------------
-useradd --system --no-create-home --shell /usr/sbin/nologin raptorcare 2>/dev/null || true
+echo "🦅 RaptorCare Installation (Production Mode)"
+echo "===================================="
 
-# -------------------------
-# SYSTEM USER
-# -------------------------
-echo_step "Creating system user..."
+# RaptorCare directories
+# =========================
 
-if ! id -u raptorcare >/dev/null 2>&1; then
-    useradd --system --no-create-home --shell /usr/sbin/nologin raptorcare
-fi
+UPLOAD_DIR="/var/lib/raptorcare/uploads"
 
-chown -R raptorcare:raptorcare "$REPO_ROOT"
-
-# -------------------------
-# UPLOAD DIR
-# -------------------------
 echo "📁 Creating upload directory..."
-mkdir -p "$UPLOAD_DIR"
-chown -R raptorcare:raptorcare /var/lib/raptorcare
-chmod -R 750 /var/lib/raptorcare
+sudo mkdir -p "$UPLOAD_DIR"
+sudo chown -R raptorcare:raptorcare /var/lib/raptorcare
+sudo chmod -R 750 /var/lib/raptorcare
 
 # -------------------------
-# DEPENDENCIES
+# SYSTEM DEPENDENCIES
 # -------------------------
-echo "📦 Installing dependencies..."
+echo_step "Installing system dependencies..."
 apt-get update
 apt-get install -y \
+    software-properties-common \
+    git curl wget \
     python3.12 python3.12-venv python3.12-dev \
     postgresql libpq-dev \
-    nodejs npm software-properties-common \
-    git curl wget rsync
+    nodejs npm \
+    rsync
 
 # -------------------------
-# PROJECT DEPLOY
+# MOVE PROJECT TO /opt
 # -------------------------
 echo_step "Deploying project to /opt/raptorcare..."
+
 mkdir -p "$TARGET_DIR"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-rsync -a --delete --exclude venv --exclude .git "$REPO_ROOT/" "$TARGET_DIR/"
+
+rsync -a --exclude 'venv' --exclude '.git' "$REPO_ROOT/" "$TARGET_DIR/"
+
 REPO_ROOT="$TARGET_DIR"
+cd "$REPO_ROOT"
 
-cd "$TARGET_DIR"
-
-chown -R raptorcare:raptorcare "$TARGET_DIR"
+chown -R root:root "$TARGET_DIR"
 
 # -------------------------
-# VENV
+# VIRTUAL ENV
 # -------------------------
-echo "🐍 Setting up venv..."
+echo_step "Preparing Python virtual environment..."
+
 if [ ! -d "$VENV_DIR" ]; then
     $PYTHON_BIN -m venv "$VENV_DIR"
 fi
 
 source "$VENV_DIR/bin/activate"
+
 echo_step "Ensuring pip availability..."
 
 if ! python -m pip --version >/dev/null 2>&1; then
@@ -106,24 +90,48 @@ echo_step "Upgrading pip tooling..."
 python -m pip install --upgrade pip setuptools wheel
 
 # -------------------------
-# PYTORCH
+# PYTORCH (CUDA 11.8)
 # -------------------------
-echo "🔥 Installing PyTorch..."
-pip install torch==2.2.2+cu118 torchvision==0.17.2+cu118 torchaudio==2.2.2+cu118 \
- --index-url https://download.pytorch.org/whl/cu118
+echo_step "Installing PyTorch (CUDA 11.8)..."
+
+python -m pip install \
+  torch==2.2.2+cu118 torchvision==0.17.2+cu118 torchaudio==2.2.2+cu118 \
+  --index-url https://download.pytorch.org/whl/cu118
 
 echo "✅ PyTorch installed"
 
 # -------------------------
-# REQUIREMENTS
+# PYTHON REQUIREMENTS
 # -------------------------
 echo_step "Installing Python dependencies..."
 python -m pip install -r "$REPO_ROOT/requirements.txt"
+
 # -------------------------
-# POSTGRES
+# UI BUILD
 # -------------------------
-echo "🗄️ Starting PostgreSQL..."
+echo_step "Building UI components..."
+
+if [ -d "$REPO_ROOT/server_ui" ]; then
+  cd "$REPO_ROOT/server_ui"
+  npm install
+  npm run build
+fi
+
+if [ -d "$REPO_ROOT/station_ui" ]; then
+  cd "$REPO_ROOT/station_ui"
+  npm install
+  npm run build
+fi
+
+cd "$REPO_ROOT"
+
+# -------------------------
+# POSTGRESQL
+# -------------------------
+echo_step "Starting PostgreSQL..."
 systemctl enable postgresql --now
+
+echo_step "Creating database and user..."
 
 sudo -u postgres psql <<'SQL'
 DO $$
@@ -142,35 +150,24 @@ END$$;
 SQL
 
 # -------------------------
+# ENV FILE
+# -------------------------
+echo_step "Setting up .env..."
+
+if [ ! -f "$ENV_FILE" ]; then
+    cp "$EXAMPLE_ENV" "$ENV_FILE"
+fi
+
+# -------------------------
 # DB INIT
 # -------------------------
 echo_step "Initializing database..."
 bash "$REPO_ROOT/scripts/init_db.sh"
 
 # -------------------------
-# ENV FILE
+# OLLAMA
 # -------------------------
-if [ ! -f "$ENV_FILE" ]; then
-    cp "$EXAMPLE_ENV" "$ENV_FILE"
-fi
-
-# -------------------------
-# UI BUILD (FIXED)
-# -------------------------
-echo "🖥️ Building UI..."
-
-if [ -d "$TARGET_DIR/server_ui" ]; then
-    cd "$TARGET_DIR/server_ui"
-    npm install
-    npm run build
-    mkdir -p "$TARGET_DIR/server/static_ui"
-    cp -r dist/* "$TARGET_DIR/server/static_ui/"
-fi
-
-# -------------------------
-# OLLAMA INSTALL (FIX RESTORED)
-# -------------------------
-echo "🤖 Installing Ollama..."
+echo_step "Installing Ollama..."
 
 if ! command -v ollama >/dev/null 2>&1; then
     curl -fsSL https://ollama.ai/install.sh | sh
@@ -179,13 +176,71 @@ fi
 OLLAMA_BIN="$(command -v ollama || true)"
 
 # -------------------------
-# OLLAMA SYSTEMD SERVICE
+# SYSTEM USER
+# -------------------------
+echo_step "Creating system user..."
+
+if ! id -u raptorcare >/dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin raptorcare
+fi
+
+chown -R raptorcare:raptorcare "$REPO_ROOT"
+
+# -------------------------
+# SYSTEMD SERVICE
+# -------------------------
+echo_step "Installing systemd service..."
+
+echo "⚙️ Creating systemd service..."
+
+sudo tee /etc/systemd/system/raptorcare.service > /dev/null <<EOF
+[Unit]
+Description=RaptorCare Server
+After=network.target
+
+[Service]
+Type=simple
+User=raptorcare
+WorkingDirectory=/opt/raptorcare
+Environment="PYTHONUNBUFFERED=1"
+
+ExecStart=/opt/raptorcare/venv/bin/uvicorn server.main:app \
+  --host 0.0.0.0 \
+  --port 8000
+
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=500
+
+# Important for file writes
+ReadWritePaths=/var/lib/raptorcare
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+#systemctl enable --now raptorcare.service
+
+systemctl enable raptorcare.service
+
+echo "🚀 Starting service..."
+if ! systemctl start raptorcare.service; then
+    echo "⚠️ Service failed to start (see logs):"
+    systemctl status raptorcare.service --no-pager || true
+    journalctl -xeu raptorcare.service --no-pager || true
+fi
+
+# -------------------------
+# OLLAMA SERVICE
 # -------------------------
 if [[ -n "$OLLAMA_BIN" ]]; then
 
-    echo "⚙️ Installing Ollama service..."
+    echo_step "Installing Ollama service..."
 
-    useradd --system --no-create-home --shell /usr/sbin/nologin ollama 2>/dev/null || true
+    if ! id -u ollama >/dev/null 2>&1; then
+        useradd --system --no-create-home --shell /usr/sbin/nologin ollama
+    fi
 
     mkdir -p /var/lib/ollama/models
     chown -R ollama:ollama /var/lib/ollama || true
@@ -198,6 +253,7 @@ After=network.target
 [Service]
 Type=simple
 User=ollama
+Environment="PATH=$PATH"
 ExecStart=$OLLAMA_BIN serve
 Restart=always
 RestartSec=10
@@ -207,50 +263,7 @@ WantedBy=multi-user.target
 EOF
 
     systemctl daemon-reload
-    systemctl enable ollama.service
-    systemctl start ollama.service
-fi
-
-# -------------------------
-# SYSTEMD APP SERVICE (FIXED)
-# -------------------------
-echo "⚙️ Installing RaptorCare service..."
-
-cat > /etc/systemd/system/raptorcare.service <<EOF
-[Unit]
-Description=RaptorCare Server
-After=network.target postgresql.service ollama.service
-
-[Service]
-Type=simple
-User=raptorcare
-WorkingDirectory=$TARGET_DIR
-Environment="PYTHONUNBUFFERED=1"
-
-ExecStart=$VENV_DIR/bin/uvicorn server.main:app \
-  --host 0.0.0.0 \
-  --port 8000
-
-Restart=on-failure
-RestartSec=5
-TimeoutStartSec=300
-
-ReadWritePaths=/var/lib/raptorcare
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable raptorcare.service
-
-echo "🚀 Starting RaptorCare..."
-
-if ! systemctl start raptorcare.service; then
-    echo "❌ Service failed:"
-    systemctl status raptorcare.service --no-pager || true
-    journalctl -xeu raptorcare.service --no-pager || true
-    exit 1
+    systemctl enable --now ollama.service
 fi
 
 # -------------------------
@@ -259,10 +272,8 @@ fi
 echo ""
 echo "✅ INSTALLATION COMPLETE"
 echo "========================"
-echo "Backend: http://localhost:8000"
-echo "API:     http://localhost:8000/docs"
-echo "UI:      http://localhost:8000/ui (if mounted)"
-echo "Ollama:  systemctl status ollama.service"
+echo "Server: systemctl status raptorcare.service"
+echo "Path: $REPO_ROOT"
 echo ""
 
 # -------------------------
