@@ -48,8 +48,6 @@ if ! id -u raptorcare >/dev/null 2>&1; then
     useradd --system --no-create-home --shell /usr/sbin/nologin raptorcare
 fi
 
-chown -R raptorcare:raptorcare "$REPO_ROOT"
-
 # -------------------------
 # UPLOAD DIR
 # -------------------------
