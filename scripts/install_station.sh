@@ -83,12 +83,42 @@ else
     echo "⚠️  requirements.txt not found in $STATION_DIR"
 fi
 
+
+
 echo_step "Installing station UI dependencies and building UI..."
+
 if [[ -d "$STATION_DIR/station_ui" ]]; then
+
     cd "$STATION_DIR/station_ui"
+
+    # Fix Vite base path
+    cat > vite.config.ts <<EOF
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  base: '/',
+  plugins: [react()],
+  server: {
+    port: 4174,
+    proxy: {
+      '/api': 'http://localhost:8001'
+    }
+  }
+})
+EOF
+
     npm install
     npm run build
-    echo "✅ Built station UI"
+
+    mkdir -p "$STATION_DIR/station/static_ui"
+
+    rm -rf "$STATION_DIR/station/static_ui/"*
+
+    cp -r dist/* "$STATION_DIR/station/static_ui/"
+
+    echo "✅ Built and installed station UI"
+
     cd "$STATION_DIR"
 fi
 
@@ -129,3 +159,5 @@ Station app path:
   $STATION_DIR/station/app.py
 
 EOF
+
+systemctl restart raptorcare-station 
