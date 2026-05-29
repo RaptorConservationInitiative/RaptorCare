@@ -70,16 +70,41 @@ apt-get install -y \
 # -------------------------
 # PROJECT DEPLOY
 # -------------------------
-echo_step "Deploying project to /opt/raptorcare..."
+#echo_step "Deploying project to /opt/raptorcare..."
+#mkdir -p "$TARGET_DIR"
+
+#REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+#rsync -a --delete --exclude venv --exclude .git "$REPO_ROOT/" "$TARGET_DIR/"
+#REPO_ROOT="$TARGET_DIR"
+
+#cd "$TARGET_DIR"
+
+#chown -R raptorcare:raptorcare "$TARGET_DIR"
+
+
+echo_step "Syncing repository to /opt/raptorcare..."
+
+REPO_SRC="/root/RaptorCare"
+
+if [ ! -d "$REPO_SRC/.git" ]; then
+    echo "❌ Git repo not found in $REPO_SRC"
+    exit 1
+fi
+
+echo "🔄 Updating git repository..."
+cd "$REPO_SRC"
+git reset --hard
+git pull origin main || git pull origin master || true
+
+echo "📦 Syncing to production directory..."
 mkdir -p "$TARGET_DIR"
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-rsync -a --delete --exclude venv --exclude .git "$REPO_ROOT/" "$TARGET_DIR/"
-REPO_ROOT="$TARGET_DIR"
+rsync -a --delete \
+  --exclude venv \
+  --exclude .git \
+  --exclude node_modules \
+  "$REPO_SRC/" "$TARGET_DIR/"
 
-cd "$TARGET_DIR"
-
-chown -R raptorcare:raptorcare "$TARGET_DIR"
 
 # -------------------------
 # VENV
@@ -161,6 +186,7 @@ if [ -d "$TARGET_DIR/server_ui" ]; then
     cd "$TARGET_DIR/server_ui"
     npm install
     npm run build
+    rm -rf "$TARGET_DIR/server/static_ui"
     mkdir -p "$TARGET_DIR/server/static_ui"
     cp -r dist/* "$TARGET_DIR/server/static_ui/"
 fi
