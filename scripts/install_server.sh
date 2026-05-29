@@ -9,12 +9,13 @@ set -euo pipefail
 
 PYTHON_BIN="python3.12"
 
+REPO_SRC="/root/RaptorCare"
 TARGET_DIR="/opt/raptorcare"
 VENV_DIR="$TARGET_DIR/venv"
 ENV_FILE="$TARGET_DIR/.env"
 EXAMPLE_ENV="$TARGET_DIR/.env.example"
-
 UPLOAD_DIR="/var/lib/raptorcare/uploads"
+REPO_ROOT="$REPO_SRC"
 
 OLLAMA_BIN=""
 
