@@ -79,7 +79,7 @@ app = FastAPI(
 
 app.mount(
     "/ui",
-    StaticFiles(directory="server/static_ui", html=True),
+    StaticFiles(directory="/opt/raptorcare/server/static_ui", html=True),
     name="ui"
 )
 
