@@ -77,9 +77,12 @@ app = FastAPI(
 # STATIC UI
 # ============================================================================
 
+BASE_DIR = Path(__file__).resolve().parent
+UI_DIR = BASE_DIR / "static_ui"
+
 app.mount(
     "/ui",
-    StaticFiles(directory="/opt/raptorcare/server/static_ui", html=True),
+    StaticFiles(directory=str(UI_DIR), html=True),
     name="ui"
 )
 
