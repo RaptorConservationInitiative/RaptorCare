@@ -31,17 +31,16 @@ apt-get update
 apt-get install -y python3.12 python3.12-venv python3.12-dev git curl wget nodejs npm
 
 echo_step "Preparing station repository..."
-if [[ -f "$REPO_ROOT/station/app.py" ]]; then
-    echo "✅ Using local repository at $REPO_ROOT"
-    STATION_DIR="$REPO_ROOT"
-else
-    echo "📁 Creating station installation directory at $TARGET_DIR"
-    mkdir -p "$TARGET_DIR"
-    if [[ ! -d "$TARGET_DIR/.git" ]]; then
-        git clone https://github.com/RaptorConservationInitiative/RaptorCare.git "$TARGET_DIR"
-    fi
-    STATION_DIR="$TARGET_DIR"
-fi
+echo_step "Deploying station to $TARGET_DIR..."
+
+mkdir -p "$TARGET_DIR"
+
+rsync -a --delete \
+    --exclude venv \
+    --exclude .git \
+    "$REPO_ROOT/" "$TARGET_DIR/"
+
+STATION_DIR="$TARGET_DIR"
 
 echo_step "Creating station system user..."
 if ! id -u raptorcare-station >/dev/null 2>&1; then
