@@ -6,6 +6,8 @@ FastAPI backend for wildlife rescue station management
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import json
 import logging
@@ -68,6 +70,17 @@ app = FastAPI(
     description="Wildlife Rescue Station Management System",
     version="0.1.0",
     lifespan=lifespan
+)
+
+
+# ============================================================================
+# STATIC UI
+# ============================================================================
+
+app.mount(
+    "/ui",
+    StaticFiles(directory="server/static_ui", html=True),
+    name="ui"
 )
 
 # CORS middleware
@@ -915,6 +928,10 @@ async def root():
         "status": "running"
     }
 
+@app.get("/ui/{full_path:path}")
+async def ui_spa_fallback(full_path: str):
+    return FileResponse("server/static_ui/index.html")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
@@ -922,3 +939,4 @@ if __name__ == "__main__":
         host=settings.SERVER_HOST,
         port=settings.SERVER_PORT,
     )
+
